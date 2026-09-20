@@ -12,6 +12,7 @@ android {
     tasks.withType<org.gradle.api.tasks.testing.Test> {
         testLogging {
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+            showStandardStreams = true
         }
     }
 }
@@ -27,4 +28,5 @@ dependencies {
     testImplementation(libs.junit4); testImplementation(libs.truth); testImplementation(libs.turbine)
     testImplementation(libs.coroutines.core)
     testImplementation(libs.mockwebserver)
+    testImplementation(libs.slf4j.simple)
 }

@@ -21,6 +21,7 @@ okhttp = "5.5.0"
 bt = "1.10"
 coroutines = "1.11.0"
 timber = "5.0.1"
+slf4j = "1.7.32"
 aboutlibraries = "15.1.1"
 roborazzi = "1.73.0"
 robolectric = "4.16.1"
@@ -68,6 +69,7 @@ mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver3", versi
 coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
 aboutlibraries-m3 = { group = "com.mikepenz", name = "aboutlibraries-compose-m3", version.ref = "aboutlibraries" }
 roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }

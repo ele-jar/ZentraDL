@@ -45,6 +45,7 @@ android {
 tasks.withType<org.gradle.api.tasks.testing.Test> {
     testLogging {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStandardStreams = true
     }
 }
 dependencies {
@@ -74,4 +75,5 @@ dependencies {
     testImplementation(libs.junit4); testImplementation(libs.truth)
     testImplementation(libs.turbine); testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi)
+    testImplementation(libs.slf4j.simple)
 }
