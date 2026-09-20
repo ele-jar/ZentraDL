@@ -1,9 +1,5 @@
 package com.elejar.ZentraDL.engine.torrent
 
-import bt.magnet.MagnetUri
-import bt.metainfo.TorrentId
-import bt.net.InetPeerAddress
-import bt.protocol.Protocols
 import bt.torrent.maker.TorrentBuilder
 import com.google.common.truth.Truth.assertThat
 import java.io.File
@@ -72,9 +68,13 @@ class TorrentEngineTest {
         seeder.start()
         val seedSession = seeder.download(TorrentDownloadSpec(null, bytes, root))
 
-        val id = TorrentId.fromBytes(Protocols.fromHex(meta.idHex))
-        val magnet = MagnetUri.torrentId(id).peer(InetPeerAddress("127.0.0.1", seedPort)).buildUri().toString()
+        // Magnet link with loopback seeder as the x.pe peer hint.
+        val magnet = "magnet:?xt=urn:btih:${meta.idHex}&x.pe=127.0.0.1:$seedPort"
         assertThat(magnet).startsWith("magnet:?")
+        // Sanity: our own parser round-trips it, peer hint intact.
+        val ref = leecher.parseMagnet(magnet)
+        assertThat(ref.idHex).isEqualTo(meta.idHex)
+        assertThat(ref.peers.map { "${it.hostname}:${it.port}" }).containsExactly("127.0.0.1:$seedPort")
 
         val leecher = BtEngine(BtOptions(acceptorPort = freePort(), enableDht = false))
         leecher.start()
