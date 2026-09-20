@@ -50,5 +50,5 @@ object AppModule {
         settings: SettingsStore,
         appScope: CoroutineScope,
         @ApplicationContext ctx: Context,
-    ): TaskRepository = TaskRepository(dao, downloader, settings.connections, appScope, ctx.filesDir.resolve("downloads"))
+    ): TaskRepository = TaskRepository(dao, downloader, settings.connections, settings.maxRunning, appScope, ctx.filesDir.resolve("downloads"))
 }

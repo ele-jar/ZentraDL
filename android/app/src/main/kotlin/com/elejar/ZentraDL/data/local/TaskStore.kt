@@ -26,11 +26,17 @@ interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<TaskRecord>>
 
+    @Query("SELECT * FROM tasks")
+    suspend fun allOnce(): List<TaskRecord>
+
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun get(id: String): TaskRecord?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(task: TaskRecord)
+
+    @Query("DELETE FROM tasks WHERE id = :id")
+    suspend fun delete(id: String)
 
     @Query("UPDATE tasks SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: String, status: String)

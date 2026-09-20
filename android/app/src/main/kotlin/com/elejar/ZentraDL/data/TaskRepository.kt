@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * App-level task coordinator (P1 skeleton).
@@ -33,6 +36,7 @@ class TaskRepository @Inject constructor(
     private val dao: TaskDao,
     private val downloader: Downloader,
     private val connections: Flow<Int>,
+    private val maxRunning: Flow<Int>,
     private val appScope: CoroutineScope,
     private val defaultDir: File,
 ) {
@@ -42,6 +46,8 @@ class TaskRepository @Inject constructor(
     val progress: StateFlow<Map<String, DownloadProgress>> = _progress.asStateFlow()
 
     private val jobs = ConcurrentHashMap<String, Job>()
+    private val queueMutex = Mutex()
+    private val waiters = ArrayDeque<Pair<String, CompletableDeferred<Unit>>>()
 
     suspend fun get(id: String): TaskRecord? = dao.get(id)
 
@@ -60,8 +66,25 @@ class TaskRepository @Inject constructor(
         return id
     }
 
-    /** Starts (or attaches to) the single execution of [id]; suspends until it ends. */
+    /** Starts (or joins) the single execution of [id]; waits for a queue slot first. */
     suspend fun run(id: String) {
+        queueMutex.withLock { jobs[id] }?.join()?.let { return }
+        // Every start goes through the gate: pump() admits atomically, so even
+        // a burst of concurrent run() calls (resumeAll) can never overshoot maxRunning.
+        val gate = queueMutex.withLock {
+            val d = CompletableDeferred<Unit>()
+            waiters.addLast(id to d)
+            if (dao.get(id)?.status != "downloading") dao.updateStatus(id, "queued")
+            d
+        }
+        pump()
+        try {
+            gate.await()
+        } catch (e: CancellationException) {
+            queueMutex.withLock { waiters.removeIf { it.first == id } }
+            pump()
+            throw e
+        }
         jobs.getOrPut(id) { appScope.launch { runInternal(id) } }.join()
     }
 
@@ -72,6 +95,41 @@ class TaskRepository @Inject constructor(
     fun cancelAll() {
         jobs.values.forEach { it.cancel() }
         jobs.clear()
+    }
+
+    /** Delete record (and file when [deleteFile]). Queued waiters are released first. */
+    suspend fun delete(id: String, deleteFile: Boolean) {
+        cancel(id)
+        queueMutex.withLock { waiters.removeIf { it.first == id } }
+        val rec = dao.get(id)
+        dao.delete(id)
+        if (deleteFile && rec != null) {
+            File(rec.destPath, rec.fileName).takeIf { it.exists() }?.delete()
+        }
+        pump()
+    }
+
+    suspend fun pauseAll() {
+        jobs.keys.toList().forEach { cancel(it) }
+    }
+
+    /** Re-run everything resumable (paused, queued, failed) through the queue. */
+    suspend fun resumeAll() {
+        val ids = dao.allOnce()
+            .filter { it.status == "paused" || it.status == "queued" || it.status == "failed" }
+            .map { it.id }
+        ids.forEach { id -> appScope.launch { run(id) } }
+    }
+
+    /** Release waiting tasks into free slots. */
+    private suspend fun pump() {
+        val max = maxRunning.first()
+        queueMutex.withLock {
+            while (jobs.size < max && waiters.isNotEmpty()) {
+                val (_, gate) = waiters.removeFirst()
+                gate.complete(Unit)
+            }
+        }
     }
 
     private suspend fun runInternal(id: String) {
@@ -96,6 +154,7 @@ class TaskRepository @Inject constructor(
         } finally {
             jobs.remove(id)
             _progress.update { it - id }
+            pump()
         }
     }
 }

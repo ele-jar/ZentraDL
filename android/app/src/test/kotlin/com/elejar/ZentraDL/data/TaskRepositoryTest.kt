@@ -7,6 +7,7 @@ import com.elejar.ZentraDL.engine.model.DownloadSpec
 import com.elejar.ZentraDL.engine.model.Downloader
 import com.elejar.ZentraDL.engine.model.ResourceInfo
 import com.google.common.truth.Truth.assertThat
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,9 +27,14 @@ private class FakeDao : TaskDao {
     val records = mutableMapOf<String, TaskRecord>()
     private val flow = MutableStateFlow(emptyList<TaskRecord>())
     override fun observeAll(): Flow<List<TaskRecord>> = flow
+    override suspend fun allOnce(): List<TaskRecord> = records.values.toList()
     override suspend fun get(id: String): TaskRecord? = records[id]
     override suspend fun insert(task: TaskRecord) {
         records[task.id] = task
+        emit()
+    }
+    override suspend fun delete(id: String) {
+        records.remove(id)
         emit()
     }
     override suspend fun updateStatus(id: String, status: String) {
@@ -67,9 +73,10 @@ class TaskRepositoryTest {
         downloader: Downloader,
         dao: FakeDao = FakeDao(),
         scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        maxRunning: Flow<Int> = flowOf(4),
     ): TaskRepository {
         val dir = java.nio.file.Files.createTempDirectory("repo-test").toFile()
-        return TaskRepository(dao, downloader, flowOf(4), scope, dir)
+        return TaskRepository(dao, downloader, flowOf(4), maxRunning, scope, dir)
     }
 
     @Test fun run_completesAndUpdatesRecord(): Unit = runBlocking {
@@ -95,8 +102,7 @@ class TaskRepositoryTest {
         assertThat(dao.get(id)!!.status).isEqualTo("failed")
     }
 
-    @Test fun cancel_marksPaused(): Unit = runBlocking {
-        val dao = FakeDao()
+    @Test fun cancel_marksPaused(): Unit = runBlocking {        val dao = FakeDao()
         // Unconfined: the download body runs deterministically on this thread up to
         // the hanging collect; no pool thread can starve or reorder the sequence.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
@@ -119,5 +125,51 @@ class TaskRepositoryTest {
         job.join()
         assertThat(dao.get(id)!!.status).isEqualTo("paused")
         scope.cancel()
+    }
+
+    @Test fun queue_secondTaskWaitsForSlot(): Unit = runBlocking {
+        val dao = FakeDao()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val hanging = FakeDownloader(
+            info = ResourceInfo("https://x/f", "f", 100, null, true),
+            hang = true,
+        )
+        val r = repo(hanging, dao, scope, maxRunning = flowOf(1))
+        val a = r.enqueue("https://x/a")
+        val b = r.enqueue("https://x/b")
+        val jobA = launch { r.run(a) }
+        var waited = 0
+        while (dao.get(a)!!.status != "downloading" && waited < 100) {
+            delay(100)
+            waited++
+        }
+        val jobB = launch { r.run(b) }
+        delay(500)
+        assertThat(dao.get(a)!!.status).isEqualTo("downloading")
+        assertThat(dao.get(b)!!.status).isEqualTo("queued")
+        r.cancel(a)
+        jobA.join()
+        assertThat(dao.get(a)!!.status).isEqualTo("paused")
+        waited = 0
+        while (dao.get(b)!!.status != "downloading" && waited < 100) {
+            delay(100)
+            waited++
+        }
+        assertThat(dao.get(b)!!.status).isEqualTo("downloading")
+        r.cancel(b)
+        jobB.join()
+        scope.cancel()
+    }
+
+    @Test fun delete_removesRecordAndFile(): Unit = runBlocking {
+        val dao = FakeDao()
+        val r = repo(FakeDownloader(ResourceInfo("https://x/f", "f", 1, null, false)), dao)
+        val id = r.enqueue("https://x/f")
+        val rec = dao.get(id)!!
+        val f = File(rec.destPath, rec.fileName).apply { parentFile!!.mkdirs(); writeBytes(byteArrayOf(1)) }
+        assertThat(f.exists()).isTrue()
+        r.delete(id, deleteFile = true)
+        assertThat(dao.get(id)).isNull()
+        assertThat(f.exists()).isFalse()
     }
 }
