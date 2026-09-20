@@ -67,9 +67,10 @@ class DownloadService : Service() {
             }
             ACTION_RUN_TORRENT -> {
                 val id = intent.getStringExtra(EXTRA_ID) ?: return START_NOT_STICKY
-                ensureFg(progressNotification(id, trepoName(id), null))
+                ensureFg(progressNotification(id, "Torrent", null))
                 scope.launch {
-                    val watcher = launch { watchTorrent(id, trepoName(id)) }
+                    val name = repo.get(id)?.fileName ?: "Torrent"
+                    val watcher = launch { watchTorrent(id, name) }
                     try {
                         trepo.runTorrent(id)
                     } finally {
@@ -125,8 +126,6 @@ class DownloadService : Service() {
         updateSummary()
         if (!repo.hasRunning() && !trepo.hasActive()) stopSelf()
     }
-
-    private suspend fun trepoName(id: String): String = repo.get(id)?.fileName ?: "Torrent"
 
     private suspend fun watchProgress(id: String, title: String) {
         var lastPct = -1

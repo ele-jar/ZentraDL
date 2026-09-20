@@ -50,6 +50,9 @@ class DownloadsViewModel @Inject constructor(
     private val _resolve = MutableStateFlow<ResolveUi>(ResolveUi.Idle)
     val resolveState: StateFlow<ResolveUi> = _resolve
 
+    /** HTTP + torrent live progress in one map (torrent stats converted). */
+    private val allProgress = combine(repo.progress, trepo.tprogress) { h, t -> h + t }
+
     val items: StateFlow<List<DownloadsUi.ListItem>> = combine(
         combine(repo.records, repo.progress, query, filter, sort, ::ListInputs),
         category,
@@ -57,9 +60,6 @@ class DownloadsViewModel @Inject constructor(
     ) { i, c, tp ->
         DownloadsUi.buildList(i.records, i.progress + tp, i.query, i.filter, sortOf(i.sort), categoryId = c)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    /** HTTP + torrent live progress in one map (torrent stats converted). */
-    private val allProgress = combine(repo.progress, trepo.tprogress) { h, t -> h + t }
 
     val header: StateFlow<HeaderUi> = combine(repo.records, allProgress, repo.gateBlock) { records, progress, block ->
         val down = progress.values.sumOf { it.bytesPerSecond }

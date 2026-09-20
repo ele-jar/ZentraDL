@@ -110,6 +110,14 @@ fun DownloadsScreen(
             when (e) {
                 is DownloadsViewModel.Event.Message -> snacks.showSnackbar(e.text)
                 is DownloadsViewModel.Event.Duplicate -> duplicate = e
+                is DownloadsViewModel.Event.TorrentDeleted -> {
+                    val r = snacks.showSnackbar(
+                        message = "Deleted ${e.record.fileName}",
+                        actionLabel = "Undo",
+                        duration = SnackbarDuration.Long,
+                    )
+                    if (r == SnackbarResult.ActionPerformed) vm.undoTorrentDelete(e.record, e.row)
+                }
                 is DownloadsViewModel.Event.DeletedBatch -> {
                     val r = snacks.showSnackbar(
                         message = "Deleted ${e.records.size} downloads",
