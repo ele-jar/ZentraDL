@@ -62,6 +62,9 @@ private class FakeTaskDao : TaskDao {
     override suspend fun clearCategory(categoryId: String) = Unit
     override suspend fun updateVaulted(id: String, vaulted: Boolean) = Unit
     override suspend fun updateExpectedSha(id: String, sha256: String?) = Unit
+    override suspend fun updateUrl(id: String, url: String, extra: String) {
+        records[id] = records[id]!!.copy(url = url, extra = extra)
+    }
 }
 
 private class FakeTorrentDao : TorrentTaskDao {
