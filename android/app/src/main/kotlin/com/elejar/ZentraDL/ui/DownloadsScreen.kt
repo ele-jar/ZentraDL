@@ -2,10 +2,13 @@ package com.elejar.ZentraDL.ui
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.AlertDialog
@@ -66,10 +70,11 @@ import com.elejar.ZentraDL.designsystem.components.TaskStatus
 import com.elejar.ZentraDL.service.DownloadService
 
 /** Downloads home (P2b: list + queue; details land in P2c). */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DownloadsScreen(
     onDetails: (String) -> Unit,
+    pendingUrl: String? = null,
     vm: DownloadsViewModel = hiltViewModel(),
 ) {
     val items by vm.items.collectAsState()
@@ -80,9 +85,10 @@ fun DownloadsScreen(
     val categoryFilter by vm.categoryFilter.collectAsState()
     val ctx = LocalContext.current
     val snacks = remember { SnackbarHostState() }
-    var showAdd by remember { mutableStateOf(false) }
+    var showAdd by remember(pendingUrl) { mutableStateOf(pendingUrl != null) }
     var sortOpen by remember { mutableStateOf(false) }
     var confirmDeleteFile by remember { mutableStateOf<TaskRecord?>(null) }
+    var duplicate by remember { mutableStateOf<DownloadsViewModel.Event.Duplicate?>(null) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(DownloadsUi.StatusFilter.All) }
 
@@ -90,6 +96,7 @@ fun DownloadsScreen(
         vm.events.collect { e ->
             when (e) {
                 is DownloadsViewModel.Event.Message -> snacks.showSnackbar(e.text)
+                is DownloadsViewModel.Event.Duplicate -> duplicate = e
                 is DownloadsViewModel.Event.Deleted -> {
                     val r = snacks.showSnackbar(
                         message = "Deleted ${e.record.fileName}",
@@ -132,14 +139,28 @@ fun DownloadsScreen(
                     IconButton(onClick = { vm.setDensity(if (density == "compact") "comfortable" else "compact") }) {
                         Icon(Icons.Filled.ViewList, contentDescription = stringResource(R.string.toggle_density, density))
                     }
+                    IconButton(onClick = { vm.exportUrls { shareText(ctx, it) } }) {
+                        Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.export_list))
+                    }
                 },
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { showAdd = true },
+                // Click handling lives in the modifier below (tap + paste-and-start long-press).
+                onClick = {},
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                 text = { Text(stringResource(R.string.add_download)) },
+                // Long-press = paste-and-start (foreground clipboard read only).
+                modifier = Modifier.combinedClickable(
+                    onClick = { showAdd = true },
+                    onLongClick = {
+                        val clip = (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                            .primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
+                        if (looksLikeLink(clip)) vm.addDownload(clip) { startService(it) }
+                        else vm.message(ctx.getString(R.string.no_link_clipboard))
+                    },
+                ),
             )
         },
         snackbarHost = { SnackbarHost(snacks) },
@@ -257,7 +278,29 @@ fun DownloadsScreen(
     }
 
     if (showAdd) {
-        AddSheet(onDismiss = { showAdd = false }, onStartService = ::startService, vm = vm)
+        AddSheet(initialUrl = pendingUrl ?: "", onDismiss = { showAdd = false }, onStartService = ::startService, vm = vm)
+    }
+    duplicate?.let { d ->
+        AlertDialog(
+            onDismissRequest = { duplicate = null },
+            title = { Text(stringResource(R.string.already_in_list)) },
+            text = { Text(stringResource(R.string.already_in_list_text, d.url)) },
+            confirmButton = {
+                TextButton(onClick = { duplicate = null; onDetails(d.recordId) }) {
+                    Text(stringResource(R.string.details))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        duplicate = null
+                        vm.addDownload(d.url, d.name, d.categoryId, allowDuplicate = true) {
+                            startService(it); showAdd = false
+                        }
+                    },
+                ) { Text(stringResource(R.string.download_anyway)) }
+            },
+        )
     }
     confirmDeleteFile?.let { rec ->
         AlertDialog(
@@ -321,4 +364,10 @@ fun looksLikeLink(s: String): Boolean {
     val t = s.trim()
     return t.startsWith("http://") || t.startsWith("https://") || t.startsWith("magnet:?") ||
         (t.contains("://") && t.contains('.'))
+}
+
+/** Share plain text (URL export). */
+fun shareText(ctx: Context, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+    ctx.startActivity(Intent.createChooser(intent, null))
 }

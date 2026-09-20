@@ -47,7 +47,7 @@ import com.elejar.ZentraDL.R
 import com.elejar.ZentraDL.domain.Categorizer
 
 /**
- * Add-download sheet (P2b single-URL; batch checklist lands in P3).
+ * Add-download sheet (P2b single-URL; P3b batch + prefill from share intents).
  * Paste -> auto-resolve -> Download/Queue in <= 2 taps.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,24 +56,30 @@ fun AddSheet(
     onDismiss: () -> Unit,
     onStartService: (String) -> Unit,
     vm: DownloadsViewModel = hiltViewModel(),
+    initialUrl: String = "",
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val resolve by vm.resolveState.collectAsState()
     val conns by vm.connections.collectAsState()
     val categories by vm.categories.collectAsState()
     val ctx = LocalContext.current
-    var url by remember { mutableStateOf("") }
+    var url by remember(initialUrl) { mutableStateOf(initialUrl) }
     var name by remember { mutableStateOf("") }
     var nameEdited by remember { mutableStateOf(false) }
     var suggestion by remember { mutableStateOf<String?>(null) }
     var cat by remember { mutableStateOf<String?>(null) }
     var catPicked by remember { mutableStateOf(false) }
+    var batch by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         vm.resetResolve()
-        val clip = (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
-            .primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
-        if (looksLikeLink(clip)) suggestion = clip
+        if (looksLikeLink(initialUrl)) {
+            vm.resolve(initialUrl)
+        } else {
+            val clip = (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                .primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
+            if (looksLikeLink(clip)) suggestion = clip
+        }
     }
     LaunchedEffect(resolve) {
         val info = (resolve as? DownloadsViewModel.ResolveUi.Done)?.info
@@ -88,7 +94,16 @@ fun AddSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            Text(stringResource(R.string.add_download), style = MaterialTheme.typography.titleLarge)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.add_download),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { batch = !batch }) {
+                    Text(stringResource(if (batch) R.string.single_link else R.string.batch))
+                }
+            }
             suggestion?.let { s ->
                 FilterChip(
                     selected = false,
@@ -100,12 +115,15 @@ fun AddSheet(
             OutlinedTextField(
                 value = url,
                 onValueChange = { url = it },
-                label = { Text(stringResource(R.string.url_label)) },
-                singleLine = true,
+                label = { Text(stringResource(if (batch) R.string.batch_hint else R.string.url_label)) },
+                singleLine = !batch,
+                minLines = if (batch) 5 else 1,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { vm.resolve(url) }),
+                keyboardActions = KeyboardActions(onDone = { if (!batch) vm.resolve(url) }),
                 trailingIcon = {
-                    TextButton(onClick = { vm.resolve(url) }) { Text(stringResource(R.string.check)) }
+                    if (!batch) {
+                        TextButton(onClick = { vm.resolve(url) }) { Text(stringResource(R.string.check)) }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -166,25 +184,40 @@ fun AddSheet(
                 else -> Unit
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                val ready = resolve is DownloadsViewModel.ResolveUi.Done
-                Button(
-                    onClick = {
-                        val target = url
-                        val finalName = name.ifBlank { null }
-                        vm.addDownload(target, finalName, cat) { onStartService(it); onDismiss() }
-                    },
-                    enabled = ready,
-                    modifier = Modifier.weight(1f),
-                ) { Text(stringResource(R.string.download)) }
-                OutlinedButton(
-                    onClick = {
-                        val target = url
-                        val finalName = name.ifBlank { null }
-                        vm.addDownload(target, finalName, cat) { onDismiss() }
-                    },
-                    enabled = ready,
-                    modifier = Modifier.weight(1f),
-                ) { Text(stringResource(R.string.queue_action)) }
+                if (batch) {
+                    // Batch: no probing — one link per line, auto-categorized each.
+                    val count = url.lines().count { looksLikeLink(it) }
+                    Button(
+                        onClick = { vm.addBatch(url, cat) { onStartService(it); onDismiss() } },
+                        enabled = count > 0,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(R.string.download_n, count)) }
+                    OutlinedButton(
+                        onClick = { vm.addBatch(url, cat) {}; onDismiss() },
+                        enabled = count > 0,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(R.string.queue_action)) }
+                } else {
+                    val ready = resolve is DownloadsViewModel.ResolveUi.Done
+                    Button(
+                        onClick = {
+                            val target = url
+                            val finalName = name.ifBlank { null }
+                            vm.addDownload(target, finalName, cat) { onStartService(it); onDismiss() }
+                        },
+                        enabled = ready,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(R.string.download)) }
+                    OutlinedButton(
+                        onClick = {
+                            val target = url
+                            val finalName = name.ifBlank { null }
+                            vm.addDownload(target, finalName, cat) { onDismiss() }
+                        },
+                        enabled = ready,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(R.string.queue_action)) }
+                }
             }
         }
     }

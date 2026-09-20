@@ -43,6 +43,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun get(id: String): TaskRecord?
 
+    @Query("SELECT * FROM tasks WHERE url = :url LIMIT 1")
+    suspend fun findByUrl(url: String): TaskRecord?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(task: TaskRecord)
 

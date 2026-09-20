@@ -31,7 +31,7 @@ object Settings
 
 /** App navigation (P2c: Downloads + Settings + Details; Browser/Activity land later). */
 @Composable
-fun AppNav() {
+fun AppNav(pendingUrl: String? = null) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     // Bottom bar on top-level destinations only.
@@ -59,7 +59,7 @@ fun AppNav() {
     ) { pads ->
         NavHost(navController = nav, startDestination = Downloads, modifier = Modifier.padding(pads)) {
             composable<Downloads> {
-                DownloadsScreen(onDetails = { id -> nav.navigate(Details(id)) })
+                DownloadsScreen(onDetails = { id -> nav.navigate(Details(id)) }, pendingUrl = pendingUrl)
             }
             composable<Details> {
                 DetailsScreen(onBack = { nav.popBackStack() }, onDeleted = { nav.popBackStack() })

@@ -34,8 +34,7 @@ import kotlinx.coroutines.sync.withLock
  * Owns: metadata (Room), one live progress snapshot per running task
  * (in-memory StateFlow — progress is NEVER persisted, per ARCHITECTURE.md).
  * Transfer bytes belong to :engine.
- */
-@Singleton
+ */@Singleton
 class TaskRepository @Inject constructor(
     private val dao: TaskDao,
     private val downloader: Downloader,
@@ -64,6 +63,8 @@ class TaskRepository @Inject constructor(
 
     suspend fun get(id: String): TaskRecord? = dao.get(id)
 
+    suspend fun allUrls(): List<String> = dao.allOnce().map { it.url }
+
     suspend fun probe(url: String) = downloader.probe(url, emptyMap())
 
     suspend fun restore(record: TaskRecord) {
@@ -78,15 +79,24 @@ class TaskRepository @Inject constructor(
 
     fun hasRunning(): Boolean = jobs.isNotEmpty()
 
-    suspend fun enqueue(url: String, name: String? = null, categoryId: String? = null): String {
+    suspend fun enqueue(
+        url: String,
+        name: String? = null,
+        categoryId: String? = null,
+        allowDuplicate: Boolean = false,
+    ): String {
+        val clean = url.trim()
+        if (!allowDuplicate) {
+            dao.findByUrl(clean)?.let { throw DuplicateTask(it) }
+        }
         val id = UUID.randomUUID().toString()
         val guess = name?.takeIf { it.isNotBlank() }
-            ?: url.substringAfterLast('/').substringBefore('?').ifBlank { "download" }
-        val cat = categoryId ?: Categorizer.categorize(guess, null, url).categoryId
+            ?: clean.substringAfterLast('/').substringBefore('?').ifBlank { "download" }
+        val cat = categoryId ?: Categorizer.categorize(guess, null, clean).categoryId
         val folder = categoryDao?.get(cat)?.folder ?: "Other"
         dao.insert(
             TaskRecord(
-                id = id, url = url, fileName = guess,
+                id = id, url = clean, fileName = guess,
                 destPath = File(defaultDir, folder).absolutePath, status = "queued",
                 totalBytes = -1, createdAt = System.currentTimeMillis(),
                 categoryId = cat,
@@ -245,3 +255,6 @@ class TaskRepository @Inject constructor(
         }
     }
 }
+
+/** Thrown by [TaskRepository.enqueue] when the URL is already in the list. */
+class DuplicateTask(val record: TaskRecord) : Exception("already in list")

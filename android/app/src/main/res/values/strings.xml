@@ -68,4 +68,14 @@
     <string name="add_category">Add category</string>
     <string name="category_name">Category name</string>
     <string name="delete_category">Delete %1$s</string>
+    <string name="batch">Batch</string>
+    <string name="single_link">Single</string>
+    <string name="batch_hint">One link per line</string>
+    <string name="download_n">Download (%1$d)</string>
+    <string name="already_in_list">Already in list</string>
+    <string name="already_in_list_text">%1$s is already in your downloads.</string>
+    <string name="details">Details</string>
+    <string name="download_anyway">Download anyway</string>
+    <string name="no_link_clipboard">No link in clipboard</string>
+    <string name="export_list">Export links</string>
 </resources>

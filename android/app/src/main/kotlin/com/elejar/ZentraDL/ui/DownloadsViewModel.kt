@@ -1,5 +1,6 @@
 package com.elejar.ZentraDL.ui
 
+import com.elejar.ZentraDL.data.DuplicateTask
 import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.local.Category
@@ -109,7 +110,13 @@ class DownloadsViewModel @Inject constructor(
         _resolve.value = ResolveUi.Idle
     }
 
-    fun addDownload(url: String, name: String? = null, categoryId: String? = null, onEnqueued: (String) -> Unit) {
+    fun addDownload(
+        url: String,
+        name: String? = null,
+        categoryId: String? = null,
+        allowDuplicate: Boolean = false,
+        onEnqueued: (String) -> Unit,
+    ) {
         viewModelScope.launch {
             val clean = url.trim()
             if (clean.isBlank()) {
@@ -117,10 +124,47 @@ class DownloadsViewModel @Inject constructor(
                 return@launch
             }
             try {
-                onEnqueued(repo.enqueue(clean, name, categoryId))
+                onEnqueued(repo.enqueue(clean, name, categoryId, allowDuplicate))
+            } catch (d: DuplicateTask) {
+                _events.send(Event.Duplicate(clean, name, categoryId, d.record.id))
             } catch (e: Exception) {
                 _events.send(Event.Message("Couldn't add download: ${e.message}"))
             }
+        }
+    }
+
+    /** Paste-a-list: one URL per line, no probing; dupes skipped with a count. */
+    fun addBatch(raw: String, categoryId: String?, startFirst: Boolean, onStart: (String) -> Unit) {
+        viewModelScope.launch {
+            val urls = raw.lines().map { it.trim() }.filter { looksLikeLink(it) }.distinct()
+            if (urls.isEmpty()) {
+                _events.send(Event.Message("No links found"))
+                return@launch
+            }
+            var skipped = 0
+            val ids = mutableListOf<String>()
+            urls.forEach { u ->
+                try {
+                    ids += repo.enqueue(u, null, categoryId)
+                } catch (d: DuplicateTask) {
+                    skipped++
+                }
+            }
+            _events.send(
+                Event.Message(
+                    if (skipped == 0) "Queued ${ids.size} downloads"
+                    else "Queued ${ids.size} downloads ($skipped already in list)",
+                ),
+            )
+            if (startFirst && ids.isNotEmpty()) onStart(ids.first())
+        }
+    }
+
+    fun exportUrls(onShare: (String) -> Unit) {
+        viewModelScope.launch {
+            val urls = repo.allUrls()
+            if (urls.isEmpty()) _events.send(Event.Message("Nothing to export"))
+            else onShare(urls.joinToString("\n"))
         }
     }
 
@@ -193,5 +237,6 @@ class DownloadsViewModel @Inject constructor(
     sealed interface Event {
         data class Message(val text: String) : Event
         data class Deleted(val record: TaskRecord) : Event
+        data class Duplicate(val url: String, val name: String?, val categoryId: String?, val recordId: String) : Event
     }
 }

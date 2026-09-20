@@ -33,6 +33,7 @@ private class FakeDao : TaskDao {
     override fun observe(id: String): Flow<TaskRecord?> = flow.map { list -> list.firstOrNull { it.id == id } }
     override suspend fun allOnce(): List<TaskRecord> = records.values.toList()
     override suspend fun get(id: String): TaskRecord? = records[id]
+    override suspend fun findByUrl(url: String): TaskRecord? = records.values.firstOrNull { it.url == url }
     override suspend fun insert(task: TaskRecord) {
         records[task.id] = task
         emit()
@@ -192,5 +193,19 @@ class TaskRepositoryTest {
         r.delete(id, deleteFile = true)
         assertThat(dao.get(id)).isNull()
         assertThat(f.exists()).isFalse()
+    }
+
+    @Test fun enqueue_duplicateThrowsUnlessAllowed(): Unit = runBlocking {
+        val dao = FakeDao()
+        val r = repo(FakeDownloader(ResourceInfo("https://x/f", "f", 1, null, false)), dao)
+        val first = r.enqueue("https://x/f")
+        try {
+            r.enqueue("https://x/f")
+            throw AssertionError("expected DuplicateTask")
+        } catch (d: DuplicateTask) {
+            assertThat(d.record.id).isEqualTo(first)
+        }
+        val second = r.enqueue("https://x/f", allowDuplicate = true)
+        assertThat(second).isNotEqualTo(first)
     }
 }
