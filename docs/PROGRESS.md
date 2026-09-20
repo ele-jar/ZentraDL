@@ -7,6 +7,7 @@
 |---|---|---|---|
 | P0 | Foundations (skills, agents, env, AGENTS.md, Gradle skeleton, CI) | DONE | CI green 2026-09-20 (D010 Kotlin-only pivot; D011 sdk37.2) |
 | P1 | Engine bridge, Kotlin edition (OkHttp engine, Room/DataStore/Hilt, FGS, skeleton screen, E2E) | DONE | CI green 2026-09-20: 17 tests (MockWebServer range/resume/fallback, repo lifecycle), debug+release APKs |
+| P2a | Design system (theme, status colors, cards, chips, states + Previews) | DONE | CI green 2026-09-20. UI checklist: M3 roles only ✓, 4dp grid/48dp/middle-ellipsis/monospace-tabular ✓, progress animated 300ms ✓, TalkBack labels+stateDescription ✓, strings via params ✓, sample data in @Preview only ✓. Gaps → P2b/c: full 6-state screens, reduce-motion gate, 200%-font/RTL device pass, screenshot tests → P7 |
 | P1 | Engine bridge / walking skeleton (AAR, EngineClient, FGS, 1 HTTP + 1 magnet E2E) | TODO | Needs ENGINE_API.md contract first |
 | P2 | Design system + HTTP MVP | TODO | — |
 | P3 | Organization & control | TODO | — |
