@@ -61,7 +61,18 @@ class TaskRepository @Inject constructor(
     private val _gateBlock = MutableStateFlow<GateBlock?>(null)
     val gateBlock: StateFlow<GateBlock?> = _gateBlock.asStateFlow()
 
+    fun observe(id: String): Flow<TaskRecord?> = dao.observe(id)
+
+    private val _progress = MutableStateFlow(mapOf<String, DownloadProgress>())
+    val progress: StateFlow<Map<String, DownloadProgress>> = _progress.asStateFlow()
+
+    private val jobs = ConcurrentHashMap<String, Job>()
+    private val queueMutex = Mutex()
+    private val waiters = ArrayDeque<Pair<String, CompletableDeferred<Unit>>>()
+
     init {
+        // AFTER all fields: init publishes this via appScope.launch, and a pool
+        // worker (or Unconfined) may run the body before the constructor returns.
         // Seed built-ins once; IGNORE keeps user edits. Null in unit tests.
         appScope.launch { categoryDao?.ensureDefaults() }
         // Re-evaluate the gate on every policy/device change; pump when cleared.
@@ -73,16 +84,6 @@ class TaskRepository @Inject constructor(
                 }
         }
     }
-
-    fun observe(id: String): Flow<TaskRecord?> = dao.observe(id)
-
-    private val _progress = MutableStateFlow(mapOf<String, DownloadProgress>())
-    val progress: StateFlow<Map<String, DownloadProgress>> = _progress.asStateFlow()
-
-    private val jobs = ConcurrentHashMap<String, Job>()
-    private val queueMutex = Mutex()
-    private val waiters = ArrayDeque<Pair<String, CompletableDeferred<Unit>>>()
-
     suspend fun get(id: String): TaskRecord? = dao.get(id)
 
     suspend fun allUrls(): List<String> = dao.allOnce().map { it.url }
