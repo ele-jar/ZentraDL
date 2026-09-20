@@ -1,6 +1,7 @@
 package com.elejar.ZentraDL.engine.model
 
 import java.io.File
+import kotlinx.coroutines.flow.Flow
 
 /** What to download. Pure JVM — no Android imports in :engine. */
 data class DownloadSpec(
@@ -30,4 +31,10 @@ data class DownloadProgress(
 ) {
     val percent: Int
         get() = if (totalBytes > 0) ((downloadedBytes * 100) / totalBytes).toInt().coerceIn(0, 100) else -1
+}
+
+/** Transfer engine seam (HttpDownloader is the first implementation). */
+interface Downloader {
+    suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ResourceInfo
+    fun download(spec: DownloadSpec): Flow<DownloadProgress>
 }

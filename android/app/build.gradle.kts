@@ -38,6 +38,7 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.activity.compose)
+    implementation(libs.core.ktx)
     implementation(libs.material3)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

@@ -2,6 +2,7 @@ package com.elejar.ZentraDL.engine.http
 
 import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.DownloadSpec
+import com.elejar.ZentraDL.engine.model.Downloader
 import com.elejar.ZentraDL.engine.model.ResourceInfo
 import java.io.FileOutputStream
 import java.io.IOException
@@ -40,10 +41,10 @@ fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()
 class HttpDownloader(
     private val client: OkHttpClient = defaultHttpClient(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) {
+) : Downloader {
 
     /** Pre-check: final URL, filename, size, MIME, resumable (H4). */
-    suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ResourceInfo {
+    override suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ResourceInfo {
         val req = Request.Builder().url(url).header("Range", "bytes=0-0").apply {
             headers.forEach { (k, v) -> header(k, v) }
         }.build()
@@ -79,7 +80,7 @@ class HttpDownloader(
     }
 
     /** Cold flow: emits ~4 Hz progress, completes at 100%. Throws IOException on failure. */
-    fun download(spec: DownloadSpec): Flow<DownloadProgress> = channelFlow {
+    override fun download(spec: DownloadSpec): Flow<DownloadProgress> = channelFlow {
         val info = withContext(ioDispatcher) { probe(spec.url, spec.headers) }
         val dest = spec.destFile
         dest.parentFile?.mkdirs()

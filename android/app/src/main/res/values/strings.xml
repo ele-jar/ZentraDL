@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">ZentraDL</string>
+    <string name="notif_channel_active">Active downloads</string>
+    <string name="url_hint">Paste a link to download</string>
+    <string name="download">Download</string>
+    <string name="stop">Stop</string>
+    <string name="stop_all">Stop all</string>
+    <string name="starting">Starting…</string>
+    <string name="empty_hint">No downloads yet — paste a link above to start.</string>
 </resources>
