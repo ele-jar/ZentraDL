@@ -163,8 +163,20 @@ class TorrentRepositoryTest {
             assertThat(dao.get(id)?.status).isEqualTo("paused")
 
             val job2 = launch { trepo.runTorrent(id) }
-            withTimeout(60_000) {
-                while (dao.get(id)?.status != "seeding") delay(200)
+            try {
+                withTimeout(60_000) {
+                    while (dao.get(id)?.status != "seeding") {
+                        if (dao.get(id)?.status == "failed") {
+                            throw AssertionError("resume failed: ${dao.get(id)?.error}")
+                        }
+                        delay(200)
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                throw AssertionError(
+                    "resume stuck: status=${dao.get(id)?.status} error=${dao.get(id)?.error} " +
+                        "stats=${trepo.statsOf(id)} descriptor=${engine.hasDescriptor(id)}",
+                )
             }
             trepo.cancelTorrent(id)
             job2.join()
