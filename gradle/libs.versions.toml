@@ -16,6 +16,8 @@ workmanager = "2.11.2"
 webkit = "1.17.0"
 glance = "1.2.0"
 serialization = "1.11.0"
+okhttp = "5.5.0"
+coroutines = "1.11.0"
 timber = "5.0.1"
 aboutlibraries = "15.1.1"
 roborazzi = "1.73.0"
@@ -53,6 +55,10 @@ workmanager = { group = "androidx.work", name = "work-runtime-ktx", version.ref 
 webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver3", version.ref = "okhttp" }
+coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 aboutlibraries-m3 = { group = "com.mikepenz", name = "aboutlibraries-compose-m3", version.ref = "aboutlibraries" }
 roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }

@@ -11,7 +11,11 @@ android {
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 dependencies {
+    implementation(libs.okhttp)
+    implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.timber)
     testImplementation(libs.junit4); testImplementation(libs.truth); testImplementation(libs.turbine)
+    testImplementation(libs.coroutines.core)
+    testImplementation(libs.mockwebserver)
 }
