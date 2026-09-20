@@ -28,10 +28,21 @@ data class DownloadProgress(
     /** Total bytes, or -1 when unknown. */
     val totalBytes: Long,
     val bytesPerSecond: Long,
+    /** Per-connection segment states (empty when unknown/single untracked). */
+    val segments: List<SegmentState> = emptyList(),
 ) {
     val percent: Int
         get() = if (totalBytes > 0) ((downloadedBytes * 100) / totalBytes).toInt().coerceIn(0, 100) else -1
 }
+
+/** One connection's byte range and its progress. Ranges are inclusive. */
+data class SegmentState(
+    val index: Int,
+    val beginByte: Long,
+    val endByte: Long,
+    val downloadedBytes: Long,
+    val retries: Int,
+)
 
 /** Transfer engine seam (HttpDownloader is the first implementation). */
 interface Downloader {

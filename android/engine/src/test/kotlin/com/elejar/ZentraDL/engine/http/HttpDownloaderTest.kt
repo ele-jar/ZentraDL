@@ -82,8 +82,25 @@ class HttpDownloaderTest {
         }
     }
 
-    @Test fun completeFile_skipsDownload(): Unit = runBlocking {
-        val data = Random.nextBytes(10_000)
+    @Test fun segments_coverTotalContiguously(): Unit = runBlocking {
+        val data = Random.nextBytes(100_000)
+        server(data, true).use { s ->
+            val dest = File(tmp.root, "out.bin")
+            val events = HttpDownloader().download(DownloadSpec(s.url("/f").toString(), dest, connections = 4)).toList()
+            val segs = events.last().segments
+            assertThat(segs).hasSize(4)
+            assertThat(segs.first().beginByte).isEqualTo(0L)
+            assertThat(segs.last().endByte).isEqualTo((data.size - 1).toLong())
+            var cursor = 0L
+            segs.forEach { sg ->
+                assertThat(sg.beginByte).isEqualTo(cursor)
+                cursor = sg.endByte + 1
+            }
+            assertThat(segs.sumOf { it.downloadedBytes }).isEqualTo(data.size.toLong())
+        }
+    }
+
+    @Test fun completeFile_skipsDownload(): Unit = runBlocking {        val data = Random.nextBytes(10_000)
         server(data, true).use { s ->
             val dest = File(tmp.root, "out.bin")
             dest.writeBytes(data)

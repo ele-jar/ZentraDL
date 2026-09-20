@@ -4,6 +4,7 @@ import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.DownloadSpec
 import com.elejar.ZentraDL.engine.model.Downloader
 import com.elejar.ZentraDL.engine.model.ResourceInfo
+import com.elejar.ZentraDL.engine.model.SegmentState
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.RandomAccessFile
@@ -95,7 +96,13 @@ class HttpDownloader(
 
         val downloaded = AtomicLong(resumeFrom)
         val ema = SpeedEma()
-        fun snapshot() = DownloadProgress(downloaded.get(), total, if (ema.stable) ema.bytesPerSecond else 0L)
+        // Per-segment trackers; snapshot() reads them lock-free (~4 Hz).
+        val trackers = mutableListOf<SegTracker>()
+        fun snapshot() = DownloadProgress(
+            downloaded.get(), total,
+            if (ema.stable) ema.bytesPerSecond else 0L,
+            trackers.map { SegmentState(it.index, it.begin, it.end, it.downloaded.get(), it.retries.get()) },
+        )
 
         val ticker = launch {
             while (true) {
@@ -107,15 +114,19 @@ class HttpDownloader(
             if (info.resumable && total > 0) {
                 RandomAccessFile(dest, "rw").use { it.setLength(total) }
                 val ranges = HttpSupport.splitRanges(total, spec.connections, resumeFrom)
-                ranges.map { range ->
-                    async(ioDispatcher) { fetchRange(spec, range, dest, downloaded, ema) }
+                ranges.mapIndexed { i, range ->
+                    val t = SegTracker(i, range.first, range.last)
+                    trackers.add(t)
+                    async(ioDispatcher) { fetchRange(spec, range, dest, downloaded, ema, t) }
                 }.awaitAll()
             } else {
+                val end = if (total > 0) total - 1 else -1L
+                val t = SegTracker(0, resumeFrom, end).also { trackers.add(it) }
                 val req = requestFor(spec, if (resumeFrom > 0) resumeFrom else null)
-                withContext(ioDispatcher) { fetchSingle(req, dest, resumeFrom > 0, downloaded, ema) }
+                withContext(ioDispatcher) { fetchSingle(req, dest, resumeFrom > 0, downloaded, ema, t) }
             }
             ticker.cancelAndJoin()
-            send(DownloadProgress(downloaded.get(), total, ema.bytesPerSecond))
+            send(snapshot())
         } finally {
             ticker.cancel()
         }
@@ -141,13 +152,14 @@ class HttpDownloader(
         dest: java.io.File,
         downloaded: AtomicLong,
         ema: SpeedEma,
-    ) = retryIo {
+        tracker: SegTracker,
+    ) = retryIo(onRetry = { tracker.retries.incrementAndGet() }) {
         client.newCall(requestForRange(spec, range)).execute().use { resp ->
             if (resp.code != 206) throw IOException("range request failed: HTTP ${resp.code}")
             val body = resp.body ?: throw IOException("empty body")
             RandomAccessFile(dest, "rw").use { raf ->
                 raf.seek(range.first)
-                copyInto(body.byteStream(), raf, downloaded, ema)
+                copyInto(body.byteStream(), raf, downloaded, ema, tracker.downloaded)
             }
         }
     }
@@ -158,7 +170,8 @@ class HttpDownloader(
         append: Boolean,
         downloaded: AtomicLong,
         ema: SpeedEma,
-    ) = retryIo {
+        tracker: SegTracker,
+    ) = retryIo(onRetry = { tracker.retries.incrementAndGet() }) {
         client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) throw IOException("download failed: HTTP ${resp.code}")
             val body = resp.body ?: throw IOException("empty body")
@@ -173,6 +186,7 @@ class HttpDownloader(
                     ema.addSample(n.toLong(), (now - last) / 1_000_000)
                     last = now
                     downloaded.addAndGet(n.toLong())
+                    tracker.downloaded.addAndGet(n.toLong())
                 }
             }
         }
@@ -183,6 +197,7 @@ class HttpDownloader(
         raf: RandomAccessFile,
         downloaded: AtomicLong,
         ema: SpeedEma,
+        segDownloaded: AtomicLong,
     ) {
         input.use {
             val buf = ByteArray(8192)
@@ -195,11 +210,12 @@ class HttpDownloader(
                 ema.addSample(n.toLong(), (now - last) / 1_000_000)
                 last = now
                 downloaded.addAndGet(n.toLong())
+                segDownloaded.addAndGet(n.toLong())
             }
         }
     }
 
-    private suspend fun retryIo(times: Int = 3, block: suspend () -> Unit) {
+    private suspend fun retryIo(times: Int = 3, onRetry: () -> Unit = {}, block: suspend () -> Unit) {
         var attempt = 0
         while (true) {
             try {
@@ -207,8 +223,15 @@ class HttpDownloader(
             } catch (e: IOException) {
                 attempt++
                 if (attempt >= times) throw e
+                onRetry()
                 delay(1000L * attempt)
             }
         }
+    }
+
+    /** Mutable per-segment counters; snapshotted into [SegmentState]. */
+    private class SegTracker(val index: Int, val begin: Long, val end: Long) {
+        val downloaded = AtomicLong(0)
+        val retries = java.util.concurrent.atomic.AtomicInteger(0)
     }
 }
