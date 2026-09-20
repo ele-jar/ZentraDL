@@ -181,7 +181,7 @@ class TorrentRepositoryTest {
             } catch (e: TimeoutCancellationException) {
                 throw AssertionError(
                     "resume stuck: status=${dao.get(id)?.status} error=${dao.get(id)?.error} " +
-                        "stats=${trepo.statsOf(id)} descriptor=${engine.hasDescriptor(id)}",
+                        "stats=${trepo.statsOf(id)}",
                 )
             }
             trepo.cancelTorrent(id)
