@@ -5,6 +5,7 @@ import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.local.Category
 import com.elejar.ZentraDL.data.local.TaskRecord
+import com.elejar.ZentraDL.domain.GateBlock
 import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.ResourceInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -53,12 +54,13 @@ class DownloadsViewModel @Inject constructor(
         DownloadsUi.buildList(i.records, i.progress, i.query, i.filter, sortOf(i.sort), categoryId = c)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val header: StateFlow<HeaderUi> = combine(repo.records, repo.progress) { records, progress ->
+    val header: StateFlow<HeaderUi> = combine(repo.records, repo.progress, repo.gateBlock) { records, progress, block ->
         val down = progress.values.sumOf { it.bytesPerSecond }
         HeaderUi(
             downSpeed = down,
             active = records.count { it.status == "downloading" },
             queued = records.count { it.status == "queued" },
+            block = block,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HeaderUi(0, 0, 0))
 
@@ -251,7 +253,7 @@ class DownloadsViewModel @Inject constructor(
         val sort: String,
     )
 
-    data class HeaderUi(val downSpeed: Long, val active: Int, val queued: Int)
+    data class HeaderUi(val downSpeed: Long, val active: Int, val queued: Int, val block: GateBlock? = null)
 
     sealed interface ResolveUi {
         data object Idle : ResolveUi

@@ -5,6 +5,10 @@ import com.elejar.ZentraDL.data.local.CategoryDao
 import com.elejar.ZentraDL.data.local.TaskDao
 import com.elejar.ZentraDL.data.local.TaskRecord
 import com.elejar.ZentraDL.domain.Categorizer
+import com.elejar.ZentraDL.domain.GateBlock
+import com.elejar.ZentraDL.domain.GatePolicy
+import com.elejar.ZentraDL.domain.GatePolicyCheck
+import com.elejar.ZentraDL.domain.NetState
 import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.DownloadSpec
 import com.elejar.ZentraDL.engine.model.Downloader
@@ -23,6 +27,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
@@ -46,13 +51,27 @@ class TaskRepository @Inject constructor(
     private val appScope: CoroutineScope,
     val defaultDir: File,
     private val categoryDao: CategoryDao? = null,
+    policy: Flow<GatePolicy> = flowOf(GatePolicy()),
+    netStates: Flow<NetState> = flowOf(NetState(connected = true, unmetered = true, charging = false)),
 ) {
     val records: Flow<List<TaskRecord>> = dao.observeAll()
     val categories: Flow<List<Category>> = categoryDao?.observeAll() ?: flowOf(emptyList())
 
+    /** Current queue-gate hold (null = clear). Drives the "Waiting for…" banner. */
+    private val _gateBlock = MutableStateFlow<GateBlock?>(null)
+    val gateBlock: StateFlow<GateBlock?> = _gateBlock.asStateFlow()
+
     init {
         // Seed built-ins once; IGNORE keeps user edits. Null in unit tests.
         appScope.launch { categoryDao?.ensureDefaults() }
+        // Re-evaluate the gate on every policy/device change; pump when cleared.
+        appScope.launch {
+            combine(policy, netStates) { p, n -> GatePolicyCheck.check(p, n, nowMinuteOfDay()) }
+                .collect { block ->
+                    _gateBlock.value = block
+                    if (block == null) pump()
+                }
+        }
     }
 
     fun observe(id: String): Flow<TaskRecord?> = dao.observe(id)
@@ -257,8 +276,9 @@ class TaskRepository @Inject constructor(
         ids.forEach { id -> appScope.launch { run(id) } }
     }
 
-    /** Release waiting tasks into free slots. */
+    /** Release waiting tasks into free slots (never while the gate is held). */
     private suspend fun pump() {
+        if (_gateBlock.value != null) return
         val max = maxRunning.first()
         queueMutex.withLock {
             while (jobs.size < max && waiters.isNotEmpty()) {
@@ -270,6 +290,11 @@ class TaskRepository @Inject constructor(
 
     private suspend fun runInternal(id: String) {
         val rec = dao.get(id) ?: return
+        // Admitted while clear, blocked since: park back in queue (banner explains).
+        if (_gateBlock.value != null) {
+            dao.updateStatus(id, "queued")
+            return
+        }
         try {
             dao.updateStatus(id, "downloading")
             dao.updateError(id, null)
@@ -299,3 +324,9 @@ class TaskRepository @Inject constructor(
 
 /** Thrown by [TaskRepository.enqueue] when the URL is already in the list. */
 class DuplicateTask(val record: TaskRecord) : Exception("already in list")
+
+/** Local minute-of-day for the schedule window. */
+fun nowMinuteOfDay(): Int {
+    val cal = java.util.Calendar.getInstance()
+    return cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+}

@@ -90,4 +90,23 @@
     <string name="expected_sha">Expected SHA-256 (optional)</string>
     <string name="checksum_match">Checksum matches — file looks good.</string>
     <string name="checksum_mismatch">Checksum does NOT match — file may be corrupt.</string>
+    <string name="network_section">Network &amp; schedule</string>
+    <string name="wifi_only">Wi-Fi only</string>
+    <string name="wifi_only_desc">Hold downloads on metered connections.</string>
+    <string name="charging_only">Charging only</string>
+    <string name="charging_only_desc">Hold downloads while on battery.</string>
+    <string name="schedule">Schedule</string>
+    <string name="schedule_desc">Only download inside a daily time window.</string>
+    <string name="schedule_start">Window start</string>
+    <string name="schedule_start_desc">Downloads resume at this time.</string>
+    <string name="schedule_end">Window end</string>
+    <string name="schedule_end_desc">Downloads hold after this time.</string>
+    <string name="speed_limit_title">Speed limit</string>
+    <string name="speed_limit_desc">Cap total download speed. 0 = no limit.</string>
+    <string name="unlimited">Unlimited</string>
+    <string name="ok">OK</string>
+    <string name="waiting_network">Waiting for network — resumes automatically.</string>
+    <string name="waiting_wifi">Waiting for Wi-Fi — metered connection held.</string>
+    <string name="waiting_charger">Waiting for charger.</string>
+    <string name="scheduled_starts">Scheduled · starts %1$s.</string>
 </resources>

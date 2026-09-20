@@ -6,10 +6,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.elejar.ZentraDL.domain.GatePolicy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 private val Context.prefs by preferencesDataStore("settings")
@@ -24,6 +26,12 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val accentKey = stringPreferencesKey("accent")
     private val dynamicColorKey = booleanPreferencesKey("dynamic_color")
+    private val wifiOnlyKey = booleanPreferencesKey("wifi_only")
+    private val chargingOnlyKey = booleanPreferencesKey("charging_only")
+    private val schedEnabledKey = booleanPreferencesKey("sched_enabled")
+    private val schedStartKey = intPreferencesKey("sched_start_min")
+    private val schedEndKey = intPreferencesKey("sched_end_min")
+    private val speedLimitKbpsKey = intPreferencesKey("speed_limit_kbps")
 
     val connections: Flow<Int> = ctx.prefs.data.map { it[connectionsKey] ?: 8 }
     val maxRunning: Flow<Int> = ctx.prefs.data.map { it[maxRunningKey] ?: 3 }
@@ -32,6 +40,20 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     val themeMode: Flow<String> = ctx.prefs.data.map { it[themeModeKey] ?: "System" }
     val accent: Flow<String> = ctx.prefs.data.map { it[accentKey] ?: "Blue" }
     val dynamicColor: Flow<Boolean> = ctx.prefs.data.map { it[dynamicColorKey] ?: true }
+    val wifiOnly: Flow<Boolean> = ctx.prefs.data.map { it[wifiOnlyKey] ?: false }
+    val chargingOnly: Flow<Boolean> = ctx.prefs.data.map { it[chargingOnlyKey] ?: false }
+    val schedEnabled: Flow<Boolean> = ctx.prefs.data.map { it[schedEnabledKey] ?: false }
+    val schedStartMin: Flow<Int> = ctx.prefs.data.map { it[schedStartKey] ?: 1320 }
+    val schedEndMin: Flow<Int> = ctx.prefs.data.map { it[schedEndKey] ?: 360 }
+    /** 0 = unlimited. */
+    val speedLimitKbps: Flow<Int> = ctx.prefs.data.map { it[speedLimitKbpsKey] ?: 0 }
+
+    /** Combined queue-gate policy (P3d). */
+    val gatePolicy: Flow<GatePolicy> = combine(
+        wifiOnly, chargingOnly, schedEnabled, schedStartMin, schedEndMin,
+    ) { wifi, charging, sched, start, end ->
+        GatePolicy(wifi, charging, if (sched) start else -1, if (sched) end else -1)
+    }
 
     suspend fun setConnections(n: Int) {
         ctx.prefs.edit { it[connectionsKey] = n.coerceIn(1, 32) }
@@ -59,5 +81,29 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
 
     suspend fun setDynamicColor(v: Boolean) {
         ctx.prefs.edit { it[dynamicColorKey] = v }
+    }
+
+    suspend fun setWifiOnly(v: Boolean) {
+        ctx.prefs.edit { it[wifiOnlyKey] = v }
+    }
+
+    suspend fun setChargingOnly(v: Boolean) {
+        ctx.prefs.edit { it[chargingOnlyKey] = v }
+    }
+
+    suspend fun setSchedEnabled(v: Boolean) {
+        ctx.prefs.edit { it[schedEnabledKey] = v }
+    }
+
+    suspend fun setSchedStartMin(v: Int) {
+        ctx.prefs.edit { it[schedStartKey] = v.coerceIn(0, 1439) }
+    }
+
+    suspend fun setSchedEndMin(v: Int) {
+        ctx.prefs.edit { it[schedEndKey] = v.coerceIn(0, 1440) }
+    }
+
+    suspend fun setSpeedLimitKbps(v: Int) {
+        ctx.prefs.edit { it[speedLimitKbpsKey] = v.coerceIn(0, 102_400) }
     }
 }

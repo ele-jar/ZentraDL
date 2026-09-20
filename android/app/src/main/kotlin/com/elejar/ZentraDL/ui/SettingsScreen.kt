@@ -18,7 +18,9 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -53,6 +55,13 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     var query by remember { mutableStateOf("") }
     var choice by remember { mutableStateOf<ChoiceState?>(null) }
     var showAddCat by remember { mutableStateOf(false) }
+    var timePick by remember { mutableStateOf<String?>(null) }
+    val wifiOnly by vm.wifiOnly.collectAsState()
+    val chargingOnly by vm.chargingOnly.collectAsState()
+    val schedEnabled by vm.schedEnabled.collectAsState()
+    val schedStart by vm.schedStartMin.collectAsState()
+    val schedEnd by vm.schedEndMin.collectAsState()
+    val speedKbps by vm.speedLimitKbps.collectAsState()
     val themeTitle = stringResource(R.string.theme)
     val accentTitle = stringResource(R.string.accent)
 
@@ -177,6 +186,62 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     }
                 }
             }
+            if (matches("network", "wifi", "charging", "schedule", "speed", "limit")) {
+                item { SectionHeader(stringResource(R.string.network_section)) }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.wifi_only),
+                        description = stringResource(R.string.wifi_only_desc),
+                        checked = wifiOnly,
+                        onCheckedChange = { vm.setWifiOnly(it) },
+                    )
+                }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.charging_only),
+                        description = stringResource(R.string.charging_only_desc),
+                        checked = chargingOnly,
+                        onCheckedChange = { vm.setChargingOnly(it) },
+                    )
+                }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.schedule),
+                        description = stringResource(R.string.schedule_desc),
+                        checked = schedEnabled,
+                        onCheckedChange = { vm.setSchedEnabled(it) },
+                    )
+                }
+                if (schedEnabled) {
+                    item {
+                        ChoiceRow(
+                            title = stringResource(R.string.schedule_start),
+                            description = stringResource(R.string.schedule_start_desc),
+                            value = fmtMin(schedStart),
+                            onClick = { timePick = "start" },
+                        )
+                    }
+                    item {
+                        ChoiceRow(
+                            title = stringResource(R.string.schedule_end),
+                            description = stringResource(R.string.schedule_end_desc),
+                            value = fmtMin(schedEnd),
+                            onClick = { timePick = "end" },
+                        )
+                    }
+                }
+                item {
+                    val mb = speedKbps / 1024
+                    SliderRow(
+                        title = stringResource(R.string.speed_limit_title),
+                        description = stringResource(R.string.speed_limit_desc),
+                        value = mb.toFloat(),
+                        valueLabel = if (mb == 0) stringResource(R.string.unlimited) else "$mb MB/s",
+                        range = 0f..50f,
+                        onValueChange = { vm.setSpeedLimitKbps(it.toInt() * 1024) },
+                    )
+                }
+            }
             if (matches("about", "version", "license")) {                item { SectionHeader(stringResource(R.string.about)) }
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -240,7 +305,33 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             },
         )
     }
+    timePick?.let { which ->
+        val initial = if (which == "start") schedStart else schedEnd
+        val picker = rememberTimePickerState(initialHour = initial / 60, initialMinute = initial % 60, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { timePick = null },
+            title = {
+                Text(stringResource(if (which == "start") R.string.schedule_start else R.string.schedule_end))
+            },
+            text = { TimePicker(picker) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val m = picker.hour * 60 + picker.minute
+                        if (which == "start") vm.setSchedStartMin(m) else vm.setSchedEndMin(m)
+                        timePick = null
+                    },
+                ) { Text(stringResource(R.string.ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { timePick = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 }
+
+/** Minutes-of-day → "22:00". */
+fun fmtMin(m: Int): String = "%02d:%02d".format(m / 60, m % 60)
 
 private data class ChoiceState(
     val key: String,

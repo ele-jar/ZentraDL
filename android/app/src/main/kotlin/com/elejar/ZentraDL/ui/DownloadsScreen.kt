@@ -513,6 +513,25 @@ private fun SpeedHeader(h: DownloadsViewModel.HeaderUi, onPauseAll: () -> Unit, 
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Gate banner: queued-vs-waiting must be explicit, never color-only.
+            val banner = when (val b = h.block) {
+                null -> null
+                is com.elejar.ZentraDL.domain.GateBlock.NoNetwork ->
+                    stringResource(R.string.waiting_network)
+                is com.elejar.ZentraDL.domain.GateBlock.WifiOnly ->
+                    stringResource(R.string.waiting_wifi)
+                is com.elejar.ZentraDL.domain.GateBlock.ChargingOnly ->
+                    stringResource(R.string.waiting_charger)
+                is com.elejar.ZentraDL.domain.GateBlock.Scheduled ->
+                    stringResource(R.string.scheduled_starts, fmtMin(b.startsAtMin))
+            }
+            if (banner != null) {
+                Text(
+                    banner,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
         TextButton(onClick = onPauseAll) { Text(stringResource(R.string.pause_all)) }
         TextButton(onClick = onResumeAll) { Text(stringResource(R.string.resume_all)) }

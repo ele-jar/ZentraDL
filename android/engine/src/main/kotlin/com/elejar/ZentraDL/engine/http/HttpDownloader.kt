@@ -42,6 +42,7 @@ fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()
 class HttpDownloader(
     private val client: OkHttpClient = defaultHttpClient(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val limiter: SpeedLimiter = SpeedLimiter(),
 ) : Downloader {
 
     /** Pre-check: final URL, filename, size, MIME, resumable (H4). */
@@ -182,6 +183,7 @@ class HttpDownloader(
                     val n = body.byteStream().read(buf)
                     if (n < 0) break
                     out.write(buf, 0, n)
+                    waitForLimit(n)
                     val now = System.nanoTime()
                     ema.addSample(n.toLong(), (now - last) / 1_000_000)
                     last = now
@@ -206,6 +208,7 @@ class HttpDownloader(
                 val n = it.read(buf)
                 if (n < 0) break
                 raf.write(buf, 0, n)
+                waitForLimit(n)
                 val now = System.nanoTime()
                 ema.addSample(n.toLong(), (now - last) / 1_000_000)
                 last = now
@@ -215,8 +218,13 @@ class HttpDownloader(
         }
     }
 
-    private suspend fun retryIo(times: Int = 3, onRetry: () -> Unit = {}, block: suspend () -> Unit) {
-        var attempt = 0
+    /** Global speed cap (blocking IO loops only — never call from the ticker). */
+    private fun waitForLimit(bytes: Int) {
+        val wait = limiter.throttle(bytes.toLong())
+        if (wait > 0) Thread.sleep(wait)
+    }
+
+    private suspend fun retryIo(times: Int = 3, onRetry: () -> Unit = {}, block: suspend () -> Unit) {        var attempt = 0
         while (true) {
             try {
                 return block()
