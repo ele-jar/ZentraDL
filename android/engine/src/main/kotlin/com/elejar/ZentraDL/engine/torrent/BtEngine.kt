@@ -46,6 +46,8 @@ data class BtOptions(
     val enableDht: Boolean = true,
     /** Re-dial interval for dropped peers (bt default 5 min — too desktop for phones). */
     val peerRetrySeconds: Long = 60,
+    /** Ban for peers deemed unreachable (bt default 30 min; stale bans stall resume). */
+    val unreachableBanSeconds: Long = 300,
 )
 
 /**
@@ -76,6 +78,7 @@ class BtEngine(
         config.maxPeerConnectionsPerTorrent = opts.maxPeersPerTorrent
         config.numOfHashingThreads = opts.hashingThreads
         config.peerConnectionRetryInterval = java.time.Duration.ofSeconds(opts.peerRetrySeconds)
+        config.unreachablePeerBanDuration = java.time.Duration.ofSeconds(opts.unreachableBanSeconds)
         val builder = BtRuntime.builder(config)
             .disableLocalServiceDiscovery()
             .disableAutomaticShutdown()
