@@ -65,3 +65,15 @@ Gopeed submodule, `core-aar` CI job, Go setup/NDK from workflow, build-core
 scripts. `:engine` is now a pure-Kotlin transfer engine (OkHttp multi-part
 HTTP now; JVM BitTorrent client in Phase 4 — replaces anacrolix; candidates
 TBD). `docs/GOPEED_*.md` = history only. This supersedes BRIEF §4.1/§4.2 (Go core).
+
+## D012 (2026-09-20) — Torrents via atomashpolskiy/bt 1.10 (no hand-rolled client)
+Writing DHT/metadata/peer-wire from scratch dwarfs the phase; bt 1.10 (Apache-2.0,
+Maven Central, Java 8, zero Android-hostile APIs per source grep) gives magnets,
+DHT, PEX, MSE, selective + sequential download, metadata exchange, recheck and
+torrent creation. API surface pinned in `docs/BT_API.md`. Accepted gaps (public
+API lacks them): per-torrent rate caps (global HTTP cap doesn't apply), per-peer
+counters/client names, live per-piece availability, re-announce. No slf4j binding
+yet (NOP + one stderr warning; our wrapper logs via Timber-worthy events only).
+Guice/R8 device behavior UNVERIFIED — keeps added, debug (no minify) is the
+test path; release needs on-device confirmation. LSD disabled (no multicast lock
+hassle); single shared runtime + one DHT socket; router bootstrap on.

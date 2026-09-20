@@ -17,6 +17,9 @@ android {
 }
 dependencies {
     implementation(libs.okhttp)
+    implementation(libs.bt.core)
+    implementation(libs.bt.http.tracker)
+    implementation(libs.bt.dht)
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.timber)
