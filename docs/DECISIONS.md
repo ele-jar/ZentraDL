@@ -27,3 +27,9 @@ While fixing, verified every version against Maven metadata: KSP has NO 2.4 line
 Downgraded Kotlin → 2.3.21; AGP → 9.4.1; added activity-compose 1.13.0; real
 minimal MainActivity + themes.xml so the skeleton compiles. Re-upgrade Kotlin
 when KSP 2.4.x ships.
+
+## D006 (2026-09-20) — compileSdk 36, not 37
+CI: `platforms;android-37` not found. Checked Google's repository2-1.xml
+directly: stable platforms stop at android-36, `android-37` appears 0 times
+(only build-tools 37 exists). NDK 29.0.14206865 confirmed present. If a future
+dep demands minCompileSdk 37, revisit the BOM instead.
