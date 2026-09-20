@@ -28,6 +28,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
@@ -60,6 +62,8 @@ class BtEngine(
 ) {
     private val metaService: IMetadataService = MetadataService()
     private var runtime: BtRuntime? = null
+    /** Serializes metadata fetches (each uses offset ports — two at once would clash). */
+    private val fetchMutex = Mutex()
 
     @Synchronized
     fun start() {
@@ -104,8 +108,29 @@ class BtEngine(
     /**
      * Fetch magnet metadata (own timeout; temp client detached after). Returns the
      * exchanged bytes too, so restarts don't re-fetch. Throws [MetadataTimeoutException].
+     *
+     * Runs on an ISOLATED transient runtime (offset ports): bt reuses data
+     * descriptors per torrent id within a runtime, so a fetch client that races
+     * ahead would poison the later download session with its own storage view.
      */
     suspend fun fetchMetadata(magnet: String, timeoutMs: Long = 60_000): FetchedMeta =
+        fetchMutex.withLock {
+            val fetcher = BtEngine(
+                opts.copy(
+                    acceptorPort = opts.acceptorPort + 100,
+                    dhtPort = opts.dhtPort + 100,
+                ),
+                ioDispatcher,
+            )
+            fetcher.start()
+            try {
+                fetcher.fetchOnOwnRuntime(magnet, timeoutMs)
+            } finally {
+                fetcher.shutdown()
+            }
+        }
+
+    private suspend fun fetchOnOwnRuntime(magnet: String, timeoutMs: Long): FetchedMeta =
         withContext(ioDispatcher) {
             val rt = runtime ?: throw IllegalStateException("BtEngine not started")
             val latch = CompletableDeferred<FetchedMeta>()
@@ -125,6 +150,7 @@ class BtEngine(
             } finally {
                 runCatching { client.stop() }
             }
+            tmp.deleteRecursively()
         }
 
     /** Start (or resume — existing data is re-verified automatically) a download. */

@@ -101,10 +101,7 @@ class TorrentEngineTest {
             val tree = dest.walkTopDown().map { it.relativeTo(dest).toString() }.sorted().toList()
             fun content(name: String): ByteArray {
                 val f = dest.walkTopDown().firstOrNull { it.isFile && it.name == name }
-                    ?: throw AssertionError(
-                        "missing $name; dest=$dest exists=${dest.exists()} " +
-                            "saveDir=${session.saveDir} stats=${session.stats.value} map=$map tree=$tree",
-                    )
+                    ?: throw AssertionError("missing $name; tree=$tree stats=${session.stats.value}")
                 return f.readBytes()
             }
             assertThat(content("a.bin")).isEqualTo(File(root, "data/a.bin").readBytes())
