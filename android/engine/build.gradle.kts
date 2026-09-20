@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.android.lib)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
 }
 android {
     namespace = "com.elejar.ZentraDL.engine"
