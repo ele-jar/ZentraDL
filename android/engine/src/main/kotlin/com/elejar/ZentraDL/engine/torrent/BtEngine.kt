@@ -67,7 +67,7 @@ class BtEngine(
         if (opts.enableDht) {
             val dht = DHTConfig()
             dht.listeningPort = opts.dhtPort
-            dht.shouldUseRouterBootstrap = true
+            dht.setShouldUseRouterBootstrap(true)
             builder.module(DHTModule(dht))
         }
         builder.module(HttpTrackerModule())
