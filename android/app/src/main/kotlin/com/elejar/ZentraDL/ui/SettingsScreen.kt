@@ -46,6 +46,8 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val maxRunning by vm.maxRunning.collectAsState()
     var query by remember { mutableStateOf("") }
     var choice by remember { mutableStateOf<ChoiceState?>(null) }
+    val themeTitle = stringResource(R.string.theme)
+    val accentTitle = stringResource(R.string.accent)
 
     fun matches(vararg texts: String): Boolean {
         val q = query.trim().lowercase()
@@ -74,7 +76,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                         value = themeMode,
                         onClick = {
                             choice = ChoiceState(
-                                "theme", stringResource(R.string.theme),
+                                "theme", themeTitle,
                                 ThemeMode.entries.map { it.name }, themeMode,
                             ) { vm.setThemeMode(it) }
                         },
@@ -88,7 +90,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                         enabled = !dynamic,
                         onClick = {
                             choice = ChoiceState(
-                                "accent", stringResource(R.string.accent),
+                                "accent", accentTitle,
                                 Accent.entries.map { it.name }, accent,
                             ) { vm.setAccent(it) }
                         },
