@@ -7,7 +7,9 @@ import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.TorrentRepository
 import com.elejar.ZentraDL.data.local.AppDatabase
+import com.elejar.ZentraDL.data.local.BookmarkDao
 import com.elejar.ZentraDL.data.local.CategoryDao
+import com.elejar.ZentraDL.data.local.HistoryDao
 import com.elejar.ZentraDL.data.local.TaskDao
 import com.elejar.ZentraDL.data.local.TorrentTaskDao
 import com.elejar.ZentraDL.engine.http.HttpDownloader
@@ -36,11 +38,20 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
         Room.databaseBuilder(ctx, AppDatabase::class.java, "zentradl.db")
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5,
+            )
             .build()
 
     @Provides
     fun provideTaskDao(db: AppDatabase): TaskDao = db.taskDao()
+
+    @Provides
+    fun provideBookmarkDao(db: AppDatabase): BookmarkDao = db.bookmarkDao()
+
+    @Provides
+    fun provideHistoryDao(db: AppDatabase): HistoryDao = db.historyDao()
 
     @Provides
     fun provideCategoryDao(db: AppDatabase): CategoryDao = db.categoryDao()

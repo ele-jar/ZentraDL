@@ -3,6 +3,7 @@ package com.elejar.ZentraDL.ui
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -30,16 +31,20 @@ data class Details(val id: String)
 data class TorrentDetails(val id: String)
 
 @Serializable
+object Browser
+
+@Serializable
 object Settings
 
-/** App navigation (P4b: + torrent add/details; Browser/Activity land later). */
+/** App navigation (P5a: + Browser; Activity lands in P6). */
 @Composable
 fun AppNav(pendingUrl: String? = null) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     // Bottom bar on top-level destinations only.
     val topRoute = entry?.destination?.route
-    val showBar = topRoute == Downloads::class.qualifiedName || topRoute == Settings::class.qualifiedName
+    val showBar = topRoute == Downloads::class.qualifiedName || topRoute == Settings::class.qualifiedName ||
+        topRoute == Browser::class.qualifiedName
     Scaffold(
         bottomBar = {
             if (showBar) {
@@ -49,6 +54,12 @@ fun AppNav(pendingUrl: String? = null) {
                         onClick = { nav.navigate(Downloads) { launchSingleTop = true } },
                         icon = { Icon(Icons.Filled.Download, contentDescription = null) },
                         label = { Text(stringResource(R.string.downloads_tab)) },
+                    )
+                    NavigationBarItem(
+                        selected = topRoute == Browser::class.qualifiedName,
+                        onClick = { nav.navigate(Browser) { launchSingleTop = true } },
+                        icon = { Icon(Icons.Filled.Language, contentDescription = null) },
+                        label = { Text(stringResource(R.string.browser_tab)) },
                     )
                     NavigationBarItem(
                         selected = topRoute == Settings::class.qualifiedName,
@@ -67,6 +78,9 @@ fun AppNav(pendingUrl: String? = null) {
                     onTorrentDetails = { id -> nav.navigate(TorrentDetails(id)) },
                     pendingUrl = pendingUrl,
                 )
+            }
+            composable<Browser> {
+                BrowserScreen()
             }
             composable<Details> {
                 DetailsScreen(onBack = { nav.popBackStack() }, onDeleted = { nav.popBackStack() })

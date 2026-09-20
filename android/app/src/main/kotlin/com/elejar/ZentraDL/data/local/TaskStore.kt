@@ -25,6 +25,8 @@ data class TaskRecord(
     val categoryId: String = "other",
     /** "http" or "torrent" (P4). */
     val kind: String = "http",
+    /** Kind extras (P5: hls bandwidth "bw=1200000"). */
+    val extra: String = "",
     /** True when moved to the private vault (P3e; hidden from the main list). */
     val vaulted: Boolean = false,
     /** Expected SHA-256 hex for manual verification (null = not set). */
@@ -74,6 +76,57 @@ interface TaskDao {
 
     @Query("UPDATE tasks SET expectedSha256 = :sha256 WHERE id = :id")
     suspend fun updateExpectedSha(id: String, sha256: String?)
+
+    @Query("UPDATE tasks SET url = :url, extra = :extra WHERE id = :id")
+    suspend fun updateUrl(id: String, url: String, extra: String)
+}
+
+/** Browser bookmark (P5a). */
+@Entity(tableName = "bookmarks")
+data class Bookmark(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val url: String,
+    val createdAt: Long,
+)
+
+@Dao
+interface BookmarkDao {
+    @Query("SELECT * FROM bookmarks ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<Bookmark>>
+
+    @Query("SELECT * FROM bookmarks WHERE url = :url LIMIT 1")
+    suspend fun findByUrl(url: String): Bookmark?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(bookmark: Bookmark)
+
+    @Query("DELETE FROM bookmarks WHERE url = :url")
+    suspend fun deleteByUrl(url: String)
+}
+
+/** Browser history entry (P5a; capped by DAO trim). */
+@Entity(tableName = "history")
+data class HistoryEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val url: String,
+    val visitedAt: Long,
+)
+
+@Dao
+interface HistoryDao {
+    @Query("SELECT * FROM history ORDER BY visitedAt DESC LIMIT 500")
+    fun observeRecent(): Flow<List<HistoryEntry>>
+
+    @Insert
+    suspend fun insert(entry: HistoryEntry)
+
+    @Query("DELETE FROM history WHERE visitedAt < :before")
+    suspend fun trimOlderThan(before: Long)
+
+    @Query("DELETE FROM history")
+    suspend fun clear()
 }
 
 /**
