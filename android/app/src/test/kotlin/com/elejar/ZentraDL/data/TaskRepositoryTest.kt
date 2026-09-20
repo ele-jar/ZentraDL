@@ -113,13 +113,8 @@ class TaskRepositoryTest {
         val r = repo(hanging, dao, scope)
         val id = r.enqueue("https://x/f")
         val job = launch { r.run(id) }
-        // Wait until runInternal provably started (all remaining steps are
-        // suspension-free until the hanging collect, so cancel always lands inside try).
-        var waited = 0
-        while (dao.get(id)!!.status != "downloading" && waited < 100) {
-            delay(100)
-            waited++
-        }
+        yield()
+        yield()
         assertThat(dao.get(id)!!.status).isEqualTo("downloading")
         r.cancel(id)
         job.join()
@@ -138,26 +133,23 @@ class TaskRepositoryTest {
         val a = r.enqueue("https://x/a")
         val b = r.enqueue("https://x/b")
         val jobA = launch { r.run(a) }
-        var waited = 0
-        while (dao.get(a)!!.status != "downloading" && waited < 100) {
-            delay(100)
-            waited++
-        }
+        yield()
+        yield()
+        assertThat(dao.get(a)!!.status).isEqualTo("downloading")
         val jobB = launch { r.run(b) }
-        delay(500)
+        yield()
+        yield()
         assertThat(dao.get(a)!!.status).isEqualTo("downloading")
         assertThat(dao.get(b)!!.status).isEqualTo("queued")
         r.cancel(a)
         jobA.join()
         assertThat(dao.get(a)!!.status).isEqualTo("paused")
-        waited = 0
-        while (dao.get(b)!!.status != "downloading" && waited < 100) {
-            delay(100)
-            waited++
-        }
+        yield()
+        yield()
         assertThat(dao.get(b)!!.status).isEqualTo("downloading")
         r.cancel(b)
         jobB.join()
+        assertThat(dao.get(b)!!.status).isEqualTo("paused")
         scope.cancel()
     }
 
