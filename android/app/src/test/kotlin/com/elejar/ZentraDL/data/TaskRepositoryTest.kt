@@ -100,7 +100,10 @@ class TaskRepositoryTest {
         // Unconfined: the download body runs deterministically on this thread up to
         // the hanging collect; no pool thread can starve or reorder the sequence.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        val hanging = FakeDownloader(ResourceInfo("https://x/f", "f", 100, null, true))
+        val hanging = FakeDownloader(
+            info = ResourceInfo("https://x/f", "f", 100, null, true),
+            hang = true,
+        )
         val r = repo(hanging, dao, scope)
         val id = r.enqueue("https://x/f")
         val job = launch { r.run(id) }
