@@ -11,6 +11,7 @@ import com.elejar.ZentraDL.engine.torrent.BtEngine
 import com.elejar.ZentraDL.engine.torrent.BtSession
 import com.elejar.ZentraDL.engine.torrent.FetchedMeta
 import com.elejar.ZentraDL.engine.torrent.TorrentDownloadSpec
+import com.elejar.ZentraDL.engine.torrent.TorrentLive
 import com.elejar.ZentraDL.engine.torrent.TorrentMeta
 import com.elejar.ZentraDL.engine.torrent.TorrentPeer
 import com.elejar.ZentraDL.engine.torrent.TorrentPieceMap
@@ -20,11 +21,13 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -229,6 +232,19 @@ class TorrentRepository(
     fun hasActive(): Boolean = sessions.isNotEmpty()
     fun statsOf(id: String): TorrentStats? = sessions[id]?.stats?.value
     fun errorOf(id: String): String? = sessions[id]?.error?.value
+
+    /** 1 Hz live snapshot while a session exists (null when paused away). */
+    fun torrentLive(id: String): Flow<TorrentLive?> = flow {
+        while (true) {
+            val s = sessions[id]
+            emit(
+                s?.let {
+                    TorrentLive(it.stats.value, it.error.value, it.peers(), it.pieceMap())
+                },
+            )
+            kotlinx.coroutines.delay(1000)
+        }
+    }
     fun pieceMapOf(id: String): TorrentPieceMap? = sessions[id]?.pieceMap()
     fun peersOf(id: String): List<TorrentPeer> = sessions[id]?.peers().orEmpty()
 

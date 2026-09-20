@@ -9,6 +9,7 @@ import com.elejar.ZentraDL.data.TorrentRepository
 import com.elejar.ZentraDL.data.local.TaskRecord
 import com.elejar.ZentraDL.data.local.TorrentTask
 import com.elejar.ZentraDL.engine.model.DownloadProgress
+import com.elejar.ZentraDL.engine.torrent.TorrentLive
 import com.elejar.ZentraDL.engine.torrent.TorrentMeta
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -39,6 +40,10 @@ class TorrentDetailsViewModel @Inject constructor(
 
     val progress: StateFlow<DownloadProgress?> = trepo.tprogress
         .map { it[args.id] }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** 1 Hz live snapshot (stats/peers/pieces) while a session exists. */
+    val live: StateFlow<TorrentLive?> = trepo.torrentLive(args.id)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _meta = MutableStateFlow<TorrentMeta?>(null)

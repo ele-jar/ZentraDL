@@ -65,6 +65,14 @@ data class TorrentStats(
 /** One connected peer (public API has no per-peer counters or client names). */
 data class TorrentPeer(val address: String, val port: Int, val peerIdHex: String?)
 
+/** 1 Hz live snapshot for the details screen (PM1 data shape: RLE, never full arrays). */
+data class TorrentLive(
+    val stats: TorrentStats?,
+    val error: String?,
+    val peers: List<TorrentPeer>,
+    val pieces: TorrentPieceMap?,
+)
+
 /** Piece states: 0 = missing, 1 = complete, 2 = skipped. */
 data class PieceRun(val state: Int, val count: Int)
 
