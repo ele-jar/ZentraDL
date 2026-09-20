@@ -4,6 +4,7 @@ import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.local.Category
 import com.elejar.ZentraDL.data.local.TaskRecord
+import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.ResourceInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -45,11 +46,11 @@ class DownloadsViewModel @Inject constructor(
     val resolveState: StateFlow<ResolveUi> = _resolve
 
     val items: StateFlow<List<DownloadsUi.ListItem>> = combine(
-        repo.records, repo.progress, query, filter, sort, category,
-        transform = { records, progress, q, f, s, c ->
-            DownloadsUi.buildList(records, progress, q, f, sortOf(s), categoryId = c)
-        },
-    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        combine(repo.records, repo.progress, query, filter, sort, ::ListInputs),
+        category,
+    ) { i, c ->
+        DownloadsUi.buildList(i.records, i.progress, i.query, i.filter, sortOf(i.sort), categoryId = c)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val header: StateFlow<HeaderUi> = combine(repo.records, repo.progress) { records, progress ->
         val down = progress.values.sumOf { it.bytesPerSecond }
@@ -170,6 +171,15 @@ class DownloadsViewModel @Inject constructor(
         "speed" -> DownloadsUi.SortMode.Speed
         else -> DownloadsUi.SortMode.Date
     }
+
+    /** Holder so the 5-input combine stays on the unambiguous overload. */
+    private data class ListInputs(
+        val records: List<TaskRecord>,
+        val progress: Map<String, DownloadProgress>,
+        val query: String,
+        val filter: DownloadsUi.StatusFilter,
+        val sort: String,
+    )
 
     data class HeaderUi(val downSpeed: Long, val active: Int, val queued: Int)
 
