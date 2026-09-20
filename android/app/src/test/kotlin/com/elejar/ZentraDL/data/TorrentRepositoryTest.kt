@@ -113,7 +113,14 @@ class TorrentRepositoryTest {
             val seedSession = seeder.download(TorrentDownloadSpec(null, bytes, root))
             // Seeder must verify + seed before anyone leeches (isolates seeder-side stalls).
             withTimeout(60_000) {
-                while (seedSession.stats.value.state != TorrentRunState.SEEDING) delay(200)
+                while (true) {
+                    val s = seedSession.stats.value
+                    if (s.state == TorrentRunState.SEEDING) break
+                    if (s.state == TorrentRunState.FAILED) {
+                        throw AssertionError("seeder failed: ${seedSession.error.value}")
+                    }
+                    delay(200)
+                }
             }
 
             val engine = BtEngine(
@@ -131,6 +138,10 @@ class TorrentRepositoryTest {
             try {
                 withTimeout(120_000) {
                     while (dao.get(id)?.status != "seeding") {
+                        trepo.errorOf(id)?.let { throw AssertionError("leecher failed: $it") }
+                        if (dao.get(id)?.status == "failed") {
+                            throw AssertionError("leecher failed: ${dao.get(id)?.error}")
+                        }
                         delay(500)
                     }
                 }

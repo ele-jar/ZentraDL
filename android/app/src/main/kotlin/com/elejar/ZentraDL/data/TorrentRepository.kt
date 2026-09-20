@@ -199,6 +199,7 @@ class TorrentRepository @Inject constructor(
 
     fun hasActive(): Boolean = sessions.isNotEmpty()
     fun statsOf(id: String): TorrentStats? = sessions[id]?.stats?.value
+    fun errorOf(id: String): String? = sessions[id]?.error?.value
     fun pieceMapOf(id: String): TorrentPieceMap? = sessions[id]?.pieceMap()
     fun peersOf(id: String): List<TorrentPeer> = sessions[id]?.peers().orEmpty()
 
