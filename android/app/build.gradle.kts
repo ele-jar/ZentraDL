@@ -42,6 +42,7 @@ dependencies {
     implementation(project(":android:designsystem"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
+    implementation(libs.icons.extended)
     implementation(libs.activity.compose)
     implementation(libs.core.ktx)
     implementation(libs.material3)
