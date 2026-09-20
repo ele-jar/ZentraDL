@@ -18,6 +18,7 @@ import java.nio.file.Files
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -110,6 +111,10 @@ class TorrentRepositoryTest {
             val seeder = BtEngine(BtOptions(acceptorPort = seedPort, bindHost = "127.0.0.1", enableDht = false))
             seeder.start()
             val seedSession = seeder.download(TorrentDownloadSpec(null, bytes, root))
+            // Seeder must verify + seed before anyone leeches (isolates seeder-side stalls).
+            withTimeout(60_000) {
+                while (seedSession.stats.value.state != TorrentRunState.SEEDING) delay(200)
+            }
 
             val engine = BtEngine(
                 BtOptions(acceptorPort = freePort(), bindHost = "127.0.0.1", enableDht = false),
@@ -123,10 +128,17 @@ class TorrentRepositoryTest {
             assertThat(dao.get(id)!!.kind).isEqualTo("torrent")
 
             val job = launch { trepo.runTorrent(id) }
-            withTimeout(120_000) {
-                while (dao.get(id)?.status != "seeding") {
-                    delay(500)
+            try {
+                withTimeout(120_000) {
+                    while (dao.get(id)?.status != "seeding") {
+                        delay(500)
+                    }
                 }
+            } catch (e: TimeoutCancellationException) {
+                throw AssertionError(
+                    "stuck: status=${dao.get(id)?.status} stats=${trepo.statsOf(id)} " +
+                        "peers=${trepo.peersOf(id)} map=${trepo.pieceMapOf(id)}",
+                )
             }
             val stats = trepo.statsOf(id)
             assertThat(stats?.state).isEqualTo(TorrentRunState.SEEDING)
