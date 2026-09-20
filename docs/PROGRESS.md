@@ -9,7 +9,7 @@
 | P1 | Engine bridge, Kotlin edition (OkHttp engine, Room/DataStore/Hilt, FGS, skeleton screen, E2E) | DONE | CI green 2026-09-20: 17 tests (MockWebServer range/resume/fallback, repo lifecycle), debug+release APKs |
 | P2a | Design system (theme, status colors, cards, chips, states + Previews) | DONE | CI green 2026-09-20. UI checklist: M3 roles only ✓, 4dp grid/48dp/middle-ellipsis/monospace-tabular ✓, progress animated 300ms ✓, TalkBack labels+stateDescription ✓, strings via params ✓, sample data in @Preview only ✓. Gaps → P2b/c: full 6-state screens, reduce-motion gate, 200%-font/RTL device pass, screenshot tests → P7 |
 | P1-old | (superseded by D010; was: AAR/EngineClient) | DONE | Replaced by Kotlin-edition P1 above |
-| P2b | Downloads list (search/filter/density, speed header, FAB) + queue basics (maxRunning, pause/resume all) | TODO | Next |
+| P2b | Downloads list (search/filter/density, speed header, FAB) + queue basics (maxRunning, pause/resume all) | DOING | Queue engine green 2026-09-20 (FIFO gate, pause/resume-all, delete, Format helpers, 9 new tests). Real bug found by hang: cancel() ignored queued waiters → rewritten cancel/pauseAll paths. List UI next |
 | P2c | Add sheet + task details + notifications upgrade + settings v1 | TODO | After P2b |
 | P3 | Organization & control | TODO | — |
 | P4 | Torrent parity + Pieces map | TODO | — |
