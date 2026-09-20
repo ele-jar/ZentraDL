@@ -9,6 +9,7 @@ import com.elejar.ZentraDL.engine.model.ResourceInfo
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -125,7 +126,9 @@ class TaskRepositoryTest {
 
     @Test fun queue_secondTaskWaitsForSlot(): Unit = runBlocking {
         val dao = FakeDao()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val errors = mutableListOf<Throwable>()
+        val handler = CoroutineExceptionHandler { _, e -> synchronized(errors) { errors += e } }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + handler)
         val hanging = FakeDownloader(
             info = ResourceInfo("https://x/f", "f", 100, null, true),
             hang = true,
@@ -133,25 +136,28 @@ class TaskRepositoryTest {
         val r = repo(hanging, dao, scope, maxRunning = flowOf(1))
         val a = r.enqueue("https://x/a")
         val b = r.enqueue("https://x/b")
-        val jobA = launch { r.run(a) }
-        yield()
-        yield()
-        assertThat(dao.get(a)!!.status).isEqualTo("downloading")
-        val jobB = launch { r.run(b) }
-        yield()
-        yield()
+        val jobA = launch(handler) { r.run(a) }
+        awaitStatus(dao, a, "downloading")
+        val jobB = launch(handler) { r.run(b) }
+        delay(500)
         assertThat(dao.get(a)!!.status).isEqualTo("downloading")
         assertThat(dao.get(b)!!.status).isEqualTo("queued")
         r.cancel(a)
         jobA.join()
         assertThat(dao.get(a)!!.status).isEqualTo("paused")
-        yield()
-        yield()
-        assertThat(dao.get(b)!!.status).isEqualTo("downloading")
+        awaitStatus(dao, b, "downloading")
         r.cancel(b)
         jobB.join()
         assertThat(dao.get(b)!!.status).isEqualTo("paused")
+        assertThat(errors).isEmpty()
         scope.cancel()
+    }
+
+    private suspend fun awaitStatus(dao: FakeDao, id: String, want: String, timeoutMs: Long = 10_000) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (dao.get(id)?.status != want && System.currentTimeMillis() < deadline) {
+            delay(100)
+        }
     }
 
     @Test fun delete_removesRecordAndFile(): Unit = runBlocking {
