@@ -65,7 +65,6 @@ class TorrentEngineTest {
 
         val seedPort = freePort()
         val seeder = BtEngine(BtOptions(acceptorPort = seedPort, bindHost = "127.0.0.1", enableDht = false))
-        seeder.start()
         val seedSession = seeder.download(TorrentDownloadSpec(null, bytes, root))
 
         // Magnet link with loopback seeder as the x.pe peer hint.
@@ -77,7 +76,6 @@ class TorrentEngineTest {
         assertThat(ref.peers.map { "${it.hostname}:${it.port}" }).containsExactly("127.0.0.1:$seedPort")
 
         val leecher = BtEngine(BtOptions(acceptorPort = freePort(), bindHost = "127.0.0.1", enableDht = false))
-        leecher.start()
         try {
             val fetched = leecher.fetchMetadata(magnet, timeoutMs = 60_000)
             assertThat(fetched.meta.idHex).isEqualTo(meta.idHex)
@@ -110,8 +108,6 @@ class TorrentEngineTest {
             session.stop()
         } finally {
             seedSession.stop()
-            seeder.shutdown()
-            leecher.shutdown()
         }
     }
 }

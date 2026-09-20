@@ -76,4 +76,5 @@ counters/client names, live per-piece availability, re-announce. No slf4j bindin
 yet (NOP + one stderr warning; our wrapper logs via Timber-worthy events only).
 Guice/R8 device behavior UNVERIFIED — keeps added, debug (no minify) is the
 test path; release needs on-device confirmation. LSD disabled (no multicast lock
-hassle); single shared runtime + one DHT socket; router bootstrap on.
+hassle); one runtime per torrent session (isolated registries — shared-runtime
+pause/resume/fetch races proved unfixable at reasonable cost); router bootstrap on.

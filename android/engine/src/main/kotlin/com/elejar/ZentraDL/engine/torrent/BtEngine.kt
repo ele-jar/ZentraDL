@@ -21,6 +21,7 @@ import bt.dht.DHTConfig
 import bt.dht.DHTModule
 import java.io.File
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -28,8 +29,6 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
@@ -37,6 +36,7 @@ import kotlinx.coroutines.withTimeout
 class MetadataTimeoutException(magnet: String) : Exception("Couldn't fetch torrent info in time for $magnet")
 
 data class BtOptions(
+    /** Base ports; each runtime takes base + an allocated offset (never shared). */
     val acceptorPort: Int = 6891,
     /** Bind address override (tests use 127.0.0.1; default = first non-loopback NIC). */
     val bindHost: String? = null,
@@ -44,20 +44,18 @@ data class BtOptions(
     val maxPeersPerTorrent: Int = 50,
     val hashingThreads: Int = 1,
     val enableDht: Boolean = true,
-    /** Re-dial interval for dropped peers (bt default 5 min — too desktop for phones). */
-    val peerRetrySeconds: Long = 60,
-    /** Ban for peers deemed unreachable (bt default 30 min; stale bans stall resume). */
-    val unreachableBanSeconds: Long = 300,
 )
 
 /**
  * JVM torrent engine over atomashpolskiy/bt 1.10 (P4a).
  *
- * One shared [BtRuntime] (single DHT socket) with automatic shutdown DISABLED:
- * bare `BtClient.stop()` only detaches, so fetch-temp clients and pause/resume
- * are safe. Finished clients keep seeding until [BtSession.stop]. Paused
- * sessions resume on the SAME client (stop empties the guards; restart
- * re-verifies automatically). Rates are sampled here — bt exposes totals only.
+ * One standalone runtime per torrent session. bt reuses data descriptors per
+ * torrent id within a runtime and unregisters them async on stop, which made
+ * shared-runtime pause/resume/fetch a race farm (stale bans, poisoned
+ * descriptors, auto-shutdown cross-talk). Isolated runtimes make every
+ * lifecycle deterministic: stop tears everything down, resume rebuilds
+ * (existing data is re-verified automatically). Finished clients keep seeding
+ * until [BtSession.stop]. Rates are sampled here — bt exposes totals only.
  * No Android imports (JVM-testable).
  */
 class BtEngine(
@@ -65,36 +63,41 @@ class BtEngine(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val metaService: IMetadataService = MetadataService()
-    private var runtime: BtRuntime? = null
-    /** Serializes metadata fetches (each uses offset ports — two at once would clash). */
-    private val fetchMutex = Mutex()
+    private val portOffset = AtomicInteger(0)
 
-    @Synchronized
-    fun start() {
-        if (runtime != null) return
+    private fun buildRuntime(): BtRuntime {
+        var last: Exception? = null
+        repeat(10) {
+            val off = portOffset.getAndIncrement()
+            var rt: BtRuntime? = null
+            try {
+                rt = buildOnce(opts.acceptorPort + off, opts.dhtPort + off)
+                rt.startup()
+                return rt
+            } catch (e: Exception) {
+                last = e
+                runCatching { rt?.shutdown() }
+            }
+        }
+        throw last ?: IllegalStateException("no free ports for torrent runtime")
+    }
+
+    private fun buildOnce(acceptorPort: Int, dhtPort: Int): BtRuntime {
         val config = Config()
-        config.acceptorPort = opts.acceptorPort
+        config.acceptorPort = acceptorPort
         if (opts.bindHost != null) config.acceptorAddress = java.net.InetAddress.getByName(opts.bindHost)
         config.maxPeerConnectionsPerTorrent = opts.maxPeersPerTorrent
         config.numOfHashingThreads = opts.hashingThreads
-        config.peerConnectionRetryInterval = java.time.Duration.ofSeconds(opts.peerRetrySeconds)
-        config.unreachablePeerBanDuration = java.time.Duration.ofSeconds(opts.unreachableBanSeconds)
         val builder = BtRuntime.builder(config)
             .disableLocalServiceDiscovery()
             .disableAutomaticShutdown()
         if (opts.enableDht) {
             val dht = DHTConfig()
-            dht.listeningPort = opts.dhtPort
+            dht.listeningPort = dhtPort
             dht.setShouldUseRouterBootstrap(true)
             builder.module(DHTModule(dht))
         }
-        runtime = builder.module(HttpTrackerModule()).build().also { it.startup() }
-    }
-
-    @Synchronized
-    fun shutdown() {
-        runtime?.shutdown()
-        runtime = null
+        return builder.module(HttpTrackerModule()).build()
     }
 
     /** Offline magnet parse (no swarm contact). Throws IllegalArgumentException on garbage. */
@@ -112,94 +115,67 @@ class BtEngine(
     fun parseTorrentBytes(bytes: ByteArray): TorrentMeta = toMeta(metaService.fromByteArray(bytes), null)
 
     /**
-     * True while a (possibly stopped, tearing down) descriptor is registered.
-     * Registering a second client too soon throws IllegalStateException, so
-     * restarts wait for this to clear (unregister fires on TorrentStopped).
-     */
-    fun hasDescriptor(idHex: String): Boolean {
-        val rt = runtime ?: return false
-        return try {
-            rt.service(TorrentRegistry::class.java)
-                .getDescriptor(TorrentId.fromBytes(Protocols.fromHex(idHex))).isPresent
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    /**
-     * Fetch magnet metadata (own timeout; temp client detached after). Returns the
+     * Fetch magnet metadata on a transient runtime (own timeout). Returns the
      * exchanged bytes too, so restarts don't re-fetch. Throws [MetadataTimeoutException].
-     *
-     * Runs on an ISOLATED transient runtime (offset ports): bt reuses data
-     * descriptors per torrent id within a runtime, so a fetch client that races
-     * ahead would poison the later download session with its own storage view.
      */
     suspend fun fetchMetadata(magnet: String, timeoutMs: Long = 60_000): FetchedMeta =
-        fetchMutex.withLock {
-            val fetcher = BtEngine(
-                opts.copy(
-                    acceptorPort = opts.acceptorPort + 100,
-                    dhtPort = opts.dhtPort + 100,
-                ),
-                ioDispatcher,
-            )
-            fetcher.start()
-            try {
-                fetcher.fetchOnOwnRuntime(magnet, timeoutMs)
-            } finally {
-                fetcher.shutdown()
-            }
-        }
-
-    private suspend fun fetchOnOwnRuntime(magnet: String, timeoutMs: Long): FetchedMeta =
         withContext(ioDispatcher) {
-            val rt = runtime ?: throw IllegalStateException("BtEngine not started")
-            val latch = CompletableDeferred<FetchedMeta>()
-            val tmp = File(System.getProperty("java.io.tmpdir"), "zdl-meta-${System.nanoTime()}")
-            val client = Bt.client(rt)
-                .storage(FileSystemStorage(tmp))
-                .magnet(magnet)
-                .afterTorrentFetched { t ->
-                    latch.complete(FetchedMeta(toMeta(t, magnet), t.source.exchangedMetadata))
-                }
-                .build()
-            client.startAsync()
+            val rt = buildRuntime()
             try {
-                withTimeout(timeoutMs) { latch.await() }
-            } catch (e: TimeoutCancellationException) {
-                throw MetadataTimeoutException(magnet)
+                val latch = CompletableDeferred<FetchedMeta>()
+                val tmp = File(System.getProperty("java.io.tmpdir"), "zdl-meta-${System.nanoTime()}")
+                val client = Bt.client(rt)
+                    .storage(FileSystemStorage(tmp))
+                    .magnet(magnet)
+                    .afterTorrentFetched { t ->
+                        latch.complete(FetchedMeta(toMeta(t, magnet), t.source.exchangedMetadata))
+                    }
+                    .build()
+                client.startAsync()
+                try {
+                    withTimeout(timeoutMs) { latch.await() }
+                } catch (e: TimeoutCancellationException) {
+                    throw MetadataTimeoutException(magnet)
+                } finally {
+                    runCatching { client.stop() }
+                    tmp.deleteRecursively()
+                }
             } finally {
-                runCatching { client.stop() }
-                tmp.deleteRecursively()
+                runCatching { rt.shutdown() }
             }
         }
 
     /** Start (or resume — existing data is re-verified automatically) a download. */
     fun download(spec: TorrentDownloadSpec): BtSession {
-        val rt = runtime ?: throw IllegalStateException("BtEngine not started")
-        val builder = Bt.client(rt).storage(FileSystemStorage(spec.saveDir))
-        // Magnet first: it carries x.pe peer hints, which the bare-bytes path would lose.
-        // Bytes are only the source when no magnet is known (pure .torrent adds).
-        if (spec.magnet != null) {
-            builder.magnet(spec.magnet)
-        } else {
-            val bytes = requireNotNull(spec.torrentBytes) { "magnet or torrentBytes required" }
-            builder.torrent { metaService.fromByteArray(bytes) }
-        }
-        if (spec.sequential) builder.sequentialSelector()
-        val wanted = spec.selectedPaths
-        if (wanted != null) {
-            builder.fileSelector { f ->
-                if (joinPath(f) in wanted) FilePriority.NORMAL_PRIORITY else FilePriority.SKIP
+        val rt = buildRuntime()
+        try {
+            val builder = Bt.client(rt).storage(FileSystemStorage(spec.saveDir))
+            // Magnet first: it carries x.pe peer hints, which the bare-bytes path would lose.
+            // Bytes are only the source when no magnet is known (pure .torrent adds).
+            if (spec.magnet != null) {
+                builder.magnet(spec.magnet)
+            } else {
+                val bytes = requireNotNull(spec.torrentBytes) { "magnet or torrentBytes required" }
+                builder.torrent { metaService.fromByteArray(bytes) }
             }
+            if (spec.sequential) builder.sequentialSelector()
+            val wanted = spec.selectedPaths
+            if (wanted != null) {
+                builder.fileSelector { f ->
+                    if (joinPath(f) in wanted) FilePriority.NORMAL_PRIORITY else FilePriority.SKIP
+                }
+            }
+            val client = builder.build()
+            val idHex = spec.magnet?.let { parseMagnet(it).idHex }
+                ?: spec.torrentBytes?.let { toMeta(metaService.fromByteArray(it), null).idHex }
+                ?: throw IllegalArgumentException("magnet or torrentBytes required")
+            val pieceLength = spec.torrentBytes?.let { metaService.fromByteArray(it).chunkSize }
+                ?: spec.pieceLength
+            return BtSession(rt, client, idHex, pieceLength, spec.saveDir)
+        } catch (e: Exception) {
+            runCatching { rt.shutdown() }
+            throw e
         }
-        val client = builder.build()
-        val idHex = spec.magnet?.let { parseMagnet(it).idHex }
-            ?: spec.torrentBytes?.let { toMeta(metaService.fromByteArray(it), null).idHex }
-            ?: throw IllegalArgumentException("magnet or torrentBytes required")
-        val pieceLength = spec.torrentBytes?.let { metaService.fromByteArray(it).chunkSize }
-            ?: spec.pieceLength
-        return BtSession(rt, client, idHex, pieceLength, spec.saveDir)
     }
 
     private fun toMeta(t: Torrent, magnet: String?): TorrentMeta {
@@ -227,7 +203,7 @@ class BtEngine(
     private fun joinPath(f: TorrentFile): String = f.pathElements.joinToString("/")
 }
 
-/** Live handle for one torrent (stats flow, pieces, peers, priority, stop/resume). */
+/** Live handle for one torrent (own runtime; stats flow, pieces, peers, priority, stop). */
 class BtSession internal constructor(
     private val runtime: BtRuntime,
     private val client: BtClient,
@@ -250,10 +226,6 @@ class BtSession internal constructor(
     @Volatile private var stopped = false
 
     init {
-        startListening()
-    }
-
-    private fun startListening() {
         val future: CompletableFuture<*> = client.startAsync({ s -> onState(s) }, 1000L)
         future.whenComplete { _, e ->
             if (e != null && !stopped) {
@@ -300,18 +272,18 @@ class BtSession internal constructor(
         return ((now - prev) * 1e9 / (at - prevAt)).toLong().coerceAtLeast(0)
     }
 
-    /** RLE piece map (null until the data descriptor exists). Skipped pieces included. */
-    fun pieceMap(): TorrentPieceMap? {
+    /** RLE piece map (null until the data descriptor exists or after stop). */
+    fun pieceMap(): TorrentPieceMap? = runCatching {
         val id = TorrentId.fromBytes(Protocols.fromHex(idHex))
         val descriptor = runtime.service(TorrentRegistry::class.java).getDescriptor(id).orElse(null)
             ?: return null
         val bitfield = descriptor.dataDescriptor?.bitfield ?: return null
-        return TorrentPieceMap(
+        TorrentPieceMap(
             total = bitfield.piecesTotal,
             pieceLength = pieceLength,
             runs = PieceRuns.build(bitfield.piecesTotal, bitfield.bitmask, bitfield.skippedBitmask),
         )
-    }
+    }.getOrNull()
 
     fun peers(): List<TorrentPeer> = (lastState?.connectedPeers.orEmpty()).map { key ->
         val p = key.peer
@@ -328,18 +300,12 @@ class BtSession internal constructor(
             if (joinPath(f) in paths) UpdatedFilePriority.HIGH_PRIORITY else UpdatedFilePriority.NORMAL_PRIORITY
         }
 
-    /** Pause (data kept; [resume] restarts on the same client). */
+    /** Pause: stops the client and tears down its runtime (resume rebuilds). */
     fun stop() {
         stopped = true
         runCatching { client.stop() }
+        runCatching { runtime.shutdown() }
         _stats.value = _stats.value.copy(state = TorrentRunState.PAUSED)
-    }
-
-    /** Resume a stopped session. */
-    fun resume() {
-        stopped = false
-        _error.value = null
-        startListening()
     }
 
     private fun joinPath(f: TorrentFile): String = f.pathElements.joinToString("/")

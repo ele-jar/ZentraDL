@@ -19,7 +19,6 @@ import com.elejar.ZentraDL.engine.torrent.TorrentStats
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +28,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeout
 
 /**
  * App-level torrent coordinator (P4). Metadata in Room ([TorrentTask]),
@@ -68,10 +65,7 @@ class TorrentRepository(
     fun observeTorrent(id: String): Flow<TorrentTask?> = torrents.observe(id)
     suspend fun torrentRow(id: String): TorrentTask? = torrents.get(id)
 
-    suspend fun fetchMeta(magnet: String): FetchedMeta {
-        engine.start()
-        return engine.fetchMetadata(magnet)
-    }
+    suspend fun fetchMeta(magnet: String): FetchedMeta = engine.fetchMetadata(magnet)
 
     fun parseFile(bytes: ByteArray): TorrentMeta = engine.parseTorrentBytes(bytes)
 
@@ -125,7 +119,6 @@ class TorrentRepository(
      * here (service holds the coroutine = FGS while seeding).
      */
     suspend fun runTorrent(id: String) {
-        engine.start()
         val row = torrents.get(id) ?: return
         val rec = tasks.get(id) ?: return
         val meta = meta(id) ?: run {
@@ -136,17 +129,6 @@ class TorrentRepository(
         // Resumes start from "paused" — snapshot it so only a *new* pause aborts the build.
         val wasPaused = rec.status == "paused"
         stopSession(id)
-        // The stopped session unregisters async (TorrentStopped event); a new
-        // client registered too soon dies with IllegalStateException.
-        try {
-            withTimeout(30_000) {
-                while (engine.hasDescriptor(id)) delay(100)
-            }
-        } catch (e: TimeoutCancellationException) {
-            tasks.updateStatus(id, "failed")
-            tasks.updateError(id, "Still shutting down — try again")
-            return
-        }
         val bytes = row.torrentPath?.let { File(it).takeIf { f -> f.exists() }?.readBytes() }
         val selected = row.selectedPaths.split(",").filter { it.isNotEmpty() }.toSet().ifEmpty { null }
         val session = engine.download(

@@ -112,10 +112,8 @@ class TorrentRepositoryTest {
             val seeder = BtEngine(
                 BtOptions(
                     acceptorPort = seedPort, bindHost = "127.0.0.1", enableDht = false,
-                    peerRetrySeconds = 5, unreachableBanSeconds = 5,
                 ),
             )
-            seeder.start()
             val seedSession = seeder.download(TorrentDownloadSpec(null, bytes, root))
             // Seeder must verify + seed before anyone leeches (isolates seeder-side stalls).
             withTimeout(60_000) {
@@ -132,7 +130,7 @@ class TorrentRepositoryTest {
             val engine = BtEngine(
                 BtOptions(
                     acceptorPort = freePort(), bindHost = "127.0.0.1",
-                    enableDht = false, peerRetrySeconds = 5, unreachableBanSeconds = 5,
+                    enableDht = false,
                 ),
             )
             val dao = FakeTaskDao()
@@ -192,8 +190,6 @@ class TorrentRepositoryTest {
             trepo.deleteTorrent(id, deleteFiles = true)
             assertThat(dao.get(id)).isNull()
             seedSession.stop()
-            seeder.shutdown()
-            engine.shutdown()
         } finally {
             scope.cancel()
         }
