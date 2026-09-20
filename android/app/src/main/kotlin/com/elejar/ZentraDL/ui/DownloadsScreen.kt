@@ -91,6 +91,7 @@ fun DownloadsScreen(
     var duplicate by remember { mutableStateOf<DownloadsViewModel.Event.Duplicate?>(null) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(DownloadsUi.StatusFilter.All) }
+    val noLinkText = stringResource(R.string.no_link_clipboard)
 
     LaunchedEffect(vm) {
         vm.events.collect { e ->
@@ -158,7 +159,7 @@ fun DownloadsScreen(
                         val clip = (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
                             .primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
                         if (looksLikeLink(clip)) vm.addDownload(clip) { startService(it) }
-                        else vm.message(ctx.getString(R.string.no_link_clipboard))
+                        else vm.message(noLinkText)
                     },
                 ),
             )
