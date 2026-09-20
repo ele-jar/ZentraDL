@@ -80,7 +80,7 @@ class TaskRepository @Inject constructor(
             dao.updateStatus(id, "downloading")
             val conns = connections.first()
             // Probe for accurate name/size (download() probes again internally; P2 dedups).
-            val info = downloader.probe(rec.url)
+            val info = downloader.probe(rec.url, emptyMap())
             val destDir = File(rec.destPath).apply { mkdirs() }
             dao.updateMeta(id, info.fileName, info.totalBytes, destDir.absolutePath)
             val spec = DownloadSpec(rec.url, File(destDir, info.fileName), connections = conns)

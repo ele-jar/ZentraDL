@@ -35,6 +35,6 @@ data class DownloadProgress(
 
 /** Transfer engine seam (HttpDownloader is the first implementation). */
 interface Downloader {
-    suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ResourceInfo
+    suspend fun probe(url: String, headers: Map<String, String>): ResourceInfo
     fun download(spec: DownloadSpec): Flow<DownloadProgress>
 }

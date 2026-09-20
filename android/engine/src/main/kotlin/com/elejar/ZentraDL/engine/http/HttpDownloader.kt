@@ -44,7 +44,7 @@ class HttpDownloader(
 ) : Downloader {
 
     /** Pre-check: final URL, filename, size, MIME, resumable (H4). */
-    override suspend fun probe(url: String, headers: Map<String, String> = emptyMap()): ResourceInfo {
+    override suspend fun probe(url: String, headers: Map<String, String>): ResourceInfo {
         val req = Request.Builder().url(url).header("Range", "bytes=0-0").apply {
             headers.forEach { (k, v) -> header(k, v) }
         }.build()

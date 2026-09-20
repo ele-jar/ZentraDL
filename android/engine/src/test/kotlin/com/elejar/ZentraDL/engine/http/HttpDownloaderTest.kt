@@ -75,7 +75,7 @@ class HttpDownloaderTest {
         val data = Random.nextBytes(50_000)
         server(data, false).use { s ->
             val dest = File(tmp.root, "out.bin")
-            val probe = HttpDownloader().probe(s.url("/f").toString())
+            val probe = HttpDownloader().probe(s.url("/f").toString(), emptyMap())
             assertThat(probe.resumable).isFalse()
             HttpDownloader().download(DownloadSpec(s.url("/f").toString(), dest, connections = 4)).toList()
             assertThat(dest.readBytes()).isEqualTo(data)
