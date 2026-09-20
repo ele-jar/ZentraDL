@@ -187,7 +187,7 @@ class TorrentRepositoryTest {
             trepo.cancelTorrent(id)
             job2.join()
 
-            trepo.deleteTorrent(id, deleteFiles = true)
+            trepo.deleteTorrent(id, deleteFile = true)
             assertThat(dao.get(id)).isNull()
             seedSession.stop()
         } finally {
