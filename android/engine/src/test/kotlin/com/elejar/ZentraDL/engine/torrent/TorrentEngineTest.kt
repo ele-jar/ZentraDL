@@ -98,10 +98,14 @@ class TorrentEngineTest {
             val map = session.pieceMap()
             assertThat(map).isNotNull()
             assertThat(map!!.complete).isEqualTo(map.total)
-            assertThat(File(dest, "data/a.bin").readBytes())
-                .isEqualTo(File(root, "data/a.bin").readBytes())
-            assertThat(File(dest, "data/sub/b.bin").readBytes())
-                .isEqualTo(File(root, "data/sub/b.bin").readBytes())
+            val tree = dest.walkTopDown().map { it.relativeTo(dest).toString() }.sorted().toList()
+            fun content(name: String): ByteArray {
+                val f = dest.walkTopDown().firstOrNull { it.isFile && it.name == name }
+                    ?: throw AssertionError("missing $name; tree=$tree")
+                return f.readBytes()
+            }
+            assertThat(content("a.bin")).isEqualTo(File(root, "data/a.bin").readBytes())
+            assertThat(content("b.bin")).isEqualTo(File(root, "data/sub/b.bin").readBytes())
             assertThat(session.error.value).isNull()
             session.stop()
         } finally {
