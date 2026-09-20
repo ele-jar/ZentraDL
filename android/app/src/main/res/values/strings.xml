@@ -1,6 +1,11 @@
 <resources>
     <string name="app_name">ZentraDL</string>
     <string name="notif_channel_active">Active downloads</string>
+    <string name="notif_channel_completed">Completed downloads</string>
+    <string name="notif_channel_failed">Failed downloads</string>
+    <string name="download_complete">Download complete</string>
+    <string name="download_failed">Download failed</string>
+    <string name="share">Share</string>
     <string name="url_hint">Paste a link to download</string>
     <string name="download">Download</string>
     <string name="stop">Stop</string>

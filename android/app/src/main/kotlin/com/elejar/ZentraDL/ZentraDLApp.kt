@@ -11,12 +11,28 @@ class ZentraDLApp : Application() {
     override fun onCreate() {
         super.onCreate()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                DownloadChannels.ACTIVE,
-                getString(R.string.notif_channel_active),
-                NotificationManager.IMPORTANCE_LOW,
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    DownloadChannels.ACTIVE,
+                    getString(R.string.notif_channel_active),
+                    NotificationManager.IMPORTANCE_LOW,
+                ),
             )
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    DownloadChannels.COMPLETED,
+                    getString(R.string.notif_channel_completed),
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ),
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    DownloadChannels.FAILED,
+                    getString(R.string.notif_channel_failed),
+                    NotificationManager.IMPORTANCE_HIGH,
+                ),
+            )
         }
     }
 }
@@ -24,4 +40,6 @@ class ZentraDLApp : Application() {
 /** Notification channel IDs. */
 object DownloadChannels {
     const val ACTIVE = "active_downloads"
+    const val COMPLETED = "completed_downloads"
+    const val FAILED = "failed_downloads"
 }
