@@ -30,7 +30,17 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
-    packaging { jniLibs { useLegacyPackaging = false } } // 16 KB page alignment via NDK r28+
+    packaging {
+        jniLibs { useLegacyPackaging = false } // 16 KB page alignment via NDK r28+
+        // bt brings Guice + Apache httpclient jars with duplicate META-INF files.
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE", "META-INF/LICENSE.txt",
+                "META-INF/NOTICE", "META-INF/NOTICE.txt",
+            )
+        }
+    }
 }
 tasks.withType<org.gradle.api.tasks.testing.Test> {
     testLogging {
