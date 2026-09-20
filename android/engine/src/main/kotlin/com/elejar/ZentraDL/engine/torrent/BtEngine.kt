@@ -36,6 +36,8 @@ class MetadataTimeoutException(magnet: String) : Exception("Couldn't fetch torre
 
 data class BtOptions(
     val acceptorPort: Int = 6891,
+    /** Bind address override (tests use 127.0.0.1; default = first non-loopback NIC). */
+    val bindHost: String? = null,
     val dhtPort: Int = 49001,
     val maxPeersPerTorrent: Int = 50,
     val hashingThreads: Int = 1,
@@ -61,6 +63,7 @@ class BtEngine(
         if (runtime != null) return
         val config = Config()
         config.acceptorPort = opts.acceptorPort
+        if (opts.bindHost != null) config.acceptorAddress = java.net.InetAddress.getByName(opts.bindHost)
         config.maxPeerConnectionsPerTorrent = opts.maxPeersPerTorrent
         config.numOfHashingThreads = opts.hashingThreads
         val builder = BtRuntime.builder(config).disableLocalServiceDiscovery()
