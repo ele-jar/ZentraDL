@@ -28,7 +28,11 @@ gomobile init
 echo "gomobile on PATH: $(command -v gomobile)"
 (
   cd "$ROOT/core/upstream"
-  mkdir -p "$OUT"
+mkdir -p "$OUT"
+# The bind runs from core/upstream: a relative --out would land inside the
+# submodule. Force absolute (D009).
+case "$OUT" in /*) ;; *) OUT="$ROOT/$OUT";; esac
+mkdir -p "$OUT"
   set -x
   gomobile bind -tags nosqlite -ldflags="-w -s -checklinkname=0" \
     -o "$OUT/libgopeed.aar" -target=android -androidapi 21 -javapkg="com.gopeed" \
@@ -36,6 +40,6 @@ echo "gomobile on PATH: $(command -v gomobile)"
   set +x
 )
 echo "bind exit: $?"
-find "$ROOT" -maxdepth 4 -name "*.aar" 2>/dev/null
+find "$ROOT" -maxdepth 6 -name "*.aar" 2>/dev/null
 test -f "$OUT/libgopeed.aar" || { echo "FATAL: AAR not produced"; ls -la "$OUT"; exit 1; }
 echo "AAR -> $OUT/libgopeed.aar"
