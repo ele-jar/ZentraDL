@@ -336,6 +336,15 @@ private fun FilesTab(meta: TorrentMeta?, selectedCsv: String?) {
 private fun PiecesTab(live: TorrentLive?) {
     var inspected by remember { mutableStateOf<Int?>(null) }
     val map = live?.pieces
+    val cells: List<PieceCell> = remember(map) {
+        if (map == null || map.total <= 0) emptyList()
+        else PieceCells.aggregate(map.total, map.runs, 1500)
+    }
+    val per = if (map != null && map.total > 0 && cells.isNotEmpty()) {
+        (map.total + cells.size - 1) / cells.size
+    } else {
+        0
+    }
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -344,10 +353,6 @@ private fun PiecesTab(live: TorrentLive?) {
             item { Text(stringResource(R.string.pieces_waiting), style = MaterialTheme.typography.bodyMedium) }
             return@LazyColumn
         }
-        val cells: List<PieceCell> = remember(map) {
-            PieceCells.aggregate(map.total, map.runs, 1500)
-        }
-        val per = (map.total + cells.size - 1) / cells.size.coerceAtLeast(1)
         item {
             Text(
                 stringResource(
