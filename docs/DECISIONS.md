@@ -58,6 +58,8 @@ D006 was wrong: stable channel DOES ship API 37 as `platforms;android-37.0` /
 37.1 / **37.2** (+betas) — my repository2-1.xml read missed them (separate
 addon index). AGP's "for example 37.2" hint was literal. Install 37.2 +
 build-tools 37.0.0; targetSdk stays 36 (Play floor).
+
+## D010 (2026-09-20) — DROP Go/gomobile: Android-only, Kotlin-only (user instruction)
 gomobile cost 5 failed CI rounds; user ordered pure Kotlin. Removed: `core/`
 Gopeed submodule, `core-aar` CI job, Go setup/NDK from workflow, build-core
 scripts. `:engine` is now a pure-Kotlin transfer engine (OkHttp multi-part
