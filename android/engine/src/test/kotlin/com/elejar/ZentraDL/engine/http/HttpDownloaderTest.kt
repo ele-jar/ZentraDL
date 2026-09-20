@@ -12,8 +12,7 @@ import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import okio.Buffer
 import org.junit.Rule
-import org.junit.Test
-import org.junit.rules.TemporaryFolder
+import org.junit.Testimport org.junit.rules.TemporaryFolder
 
 /** Serves [data] with optional Range support (P1 offline harness seed). */
 private class RangeDispatcher(private val data: ByteArray, private val supportRange: Boolean) : Dispatcher() {
@@ -39,7 +38,9 @@ private class RangeDispatcher(private val data: ByteArray, private val supportRa
 
 class HttpDownloaderTest {
 
-    @get:Rule @JvmField val tmp: TemporaryFolder = TemporaryFolder()
+    @Rule
+    @JvmField
+    val tmp: TemporaryFolder = TemporaryFolder()
 
     private fun server(data: ByteArray, supportRange: Boolean): MockWebServer =
         MockWebServer().apply {
