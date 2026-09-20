@@ -24,9 +24,9 @@ turbine = "1.2.1"
 truth = "1.4.4"
 junit4 = "4.13.2"
 minSdk = "26"
-compileSdk = "36"
+compileSdk = "37"
 targetSdk = "36"
-buildTools = "36.0.0"
+buildTools = "37.0.0"
 ndk = "29.0.14206865"
 
 [libraries]
