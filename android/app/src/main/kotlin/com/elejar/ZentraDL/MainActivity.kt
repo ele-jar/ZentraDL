@@ -1,6 +1,7 @@
 package com.elejar.ZentraDL
 
 import android.app.KeyguardManager
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -83,7 +84,7 @@ private fun GatedNav(pendingUrl: String?, settingsVm: SettingsViewModel = hiltVi
     var unlocked by remember { mutableStateOf(false) }
     val activity = ctx as? ComponentActivity
     val credLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        if (r.resultCode == ComponentActivity.RESULT_OK) unlocked = true else activity?.finish()
+        if (r.resultCode == Activity.RESULT_OK) unlocked = true else activity?.finish()
     }
     @Suppress("DEPRECATION") // Keyguard credential avoids a Biometric dep; still functional.
     fun prompt() {
