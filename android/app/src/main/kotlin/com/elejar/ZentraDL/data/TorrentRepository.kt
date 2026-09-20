@@ -65,6 +65,15 @@ class TorrentRepository(
     fun observeTorrent(id: String): Flow<TorrentTask?> = torrents.observe(id)
     suspend fun torrentRow(id: String): TorrentTask? = torrents.get(id)
 
+    fun parseMagnetRef(magnet: String) = engine.parseMagnet(magnet)
+
+    /** Preview save dir for the sheet (same logic as insert). */
+    suspend fun previewDir(categoryId: String?, name: String): File {
+        val cat = categoryId ?: Categorizer.categorize(name, null, null).categoryId
+        val folder = categories.get(cat)?.folder ?: "Other"
+        return File(filesDir.resolve("downloads"), folder)
+    }
+
     suspend fun fetchMeta(magnet: String): FetchedMeta = engine.fetchMetadata(magnet)
 
     fun parseFile(bytes: ByteArray): TorrentMeta = engine.parseTorrentBytes(bytes)
@@ -78,20 +87,44 @@ class TorrentRepository(
     }
 
     /** Add by magnet (fetches metadata first, ~60s timeout). Returns info-hash. */
-    suspend fun addMagnet(magnet: String, categoryId: String?): String {
-        val fetched = fetchMeta(magnet)
+    suspend fun addMagnet(magnet: String, categoryId: String?, allowDuplicate: Boolean = false): String {
+        val clean = magnet.trim()
+        val fetched = fetchMeta(clean)
         fetched.rawBytes?.let { metaFile(fetched.meta.idHex).writeBytes(it) }
-        return insertTorrent(fetched.meta, magnet, categoryId)
+        return addKnownMeta(fetched.meta, clean, fetched.rawBytes, categoryId, allowDuplicate)
     }
 
     /** Add by .torrent bytes. Returns info-hash. */
-    suspend fun addFile(bytes: ByteArray, categoryId: String?): String {
+    suspend fun addFile(bytes: ByteArray, categoryId: String?, allowDuplicate: Boolean = false): String {
         val meta = engine.parseTorrentBytes(bytes)
         metaFile(meta.idHex).writeBytes(bytes)
-        return insertTorrent(meta, null, categoryId)
+        return addKnownMeta(meta, null, bytes, categoryId, allowDuplicate)
     }
 
-    private suspend fun insertTorrent(meta: TorrentMeta, magnet: String?, categoryId: String?): String {
+    /** Insert already-resolved metadata (the sheet fetched it; no second round-trip). */
+    suspend fun addKnownMeta(
+        meta: TorrentMeta,
+        magnet: String?,
+        bytes: ByteArray?,
+        categoryId: String?,
+        allowDuplicate: Boolean = false,
+        sequential: Boolean = false,
+    ): String {
+        val cleanMagnet = magnet?.trim()
+        if (!allowDuplicate) {
+            val dupe = cleanMagnet?.let { tasks.findByUrl(it) } ?: tasks.get(meta.idHex)
+            dupe?.let { throw DuplicateTask(it) }
+        }
+        bytes?.let { metaFile(meta.idHex).writeBytes(it) }
+        return insertTorrent(meta, cleanMagnet, categoryId, sequential)
+    }
+
+    private suspend fun insertTorrent(
+        meta: TorrentMeta,
+        magnet: String?,
+        categoryId: String?,
+        sequential: Boolean = false,
+    ): String {
         val cat = categoryId ?: Categorizer.categorize(meta.name, null, null).categoryId
         val folder = categories.get(cat)?.folder ?: "Other"
         val destDir = File(filesDir.resolve("downloads"), folder)
@@ -107,7 +140,7 @@ class TorrentRepository(
             TorrentTask(
                 id = meta.idHex, magnet = magnet,
                 torrentPath = metaFile(meta.idHex).takeIf { it.exists() }?.absolutePath,
-                name = meta.name, sizeBytes = meta.sizeBytes,
+                name = meta.name, sizeBytes = meta.sizeBytes, sequential = sequential,
             ),
         )
         metas[meta.idHex] = meta

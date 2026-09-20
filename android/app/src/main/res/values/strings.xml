@@ -78,6 +78,16 @@
     <string name="download_anyway">Download anyway</string>
     <string name="no_link_clipboard">No link in clipboard</string>
     <string name="export_list">Export links</string>
+    <string name="add_torrent">Add torrent</string>
+    <string name="magnet_label">Magnet link</string>
+    <string name="fetch">Fetch</string>
+    <string name="pick_torrent">Pick .torrent</string>
+    <string name="fetching_meta">Fetching torrent info…</string>
+    <string name="sequential_title">Sequential download</string>
+    <string name="sequential_desc">Grab pieces in order — better for previewing media.</string>
+    <string name="free_space_in">%1$s free in %2$s</string>
+    <string name="not_enough_space">Need %1$s, only %2$s free.</string>
+    <string name="files_n">%1$d files · %2$s</string>
     <string name="selected_n">%1$d selected</string>
     <string name="clear_selection">Clear selection</string>
     <string name="rename">Rename</string>

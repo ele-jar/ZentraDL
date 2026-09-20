@@ -27,9 +27,12 @@ object Downloads
 data class Details(val id: String)
 
 @Serializable
+data class TorrentDetails(val id: String)
+
+@Serializable
 object Settings
 
-/** App navigation (P2c: Downloads + Settings + Details; Browser/Activity land later). */
+/** App navigation (P4b: + torrent add/details; Browser/Activity land later). */
 @Composable
 fun AppNav(pendingUrl: String? = null) {
     val nav = rememberNavController()
@@ -59,10 +62,17 @@ fun AppNav(pendingUrl: String? = null) {
     ) { pads ->
         NavHost(navController = nav, startDestination = Downloads, modifier = Modifier.padding(pads)) {
             composable<Downloads> {
-                DownloadsScreen(onDetails = { id -> nav.navigate(Details(id)) }, pendingUrl = pendingUrl)
+                DownloadsScreen(
+                    onDetails = { id -> nav.navigate(Details(id)) },
+                    onTorrentDetails = { id -> nav.navigate(TorrentDetails(id)) },
+                    pendingUrl = pendingUrl,
+                )
             }
             composable<Details> {
                 DetailsScreen(onBack = { nav.popBackStack() }, onDeleted = { nav.popBackStack() })
+            }
+            composable<TorrentDetails> {
+                TorrentDetailsScreen(onBack = { nav.popBackStack() }, onDeleted = { nav.popBackStack() })
             }
             composable<Settings> {
                 SettingsScreen()

@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
@@ -83,6 +84,7 @@ import com.elejar.ZentraDL.service.DownloadService
 @Composable
 fun DownloadsScreen(
     onDetails: (String) -> Unit,
+    onTorrentDetails: (String) -> Unit,
     pendingUrl: String? = null,
     vm: DownloadsViewModel = hiltViewModel(),
 ) {
@@ -94,7 +96,12 @@ fun DownloadsScreen(
     val categoryFilter by vm.categoryFilter.collectAsState()
     val ctx = LocalContext.current
     val snacks = remember { SnackbarHostState() }
-    var showAdd by remember(pendingUrl) { mutableStateOf(pendingUrl != null) }
+    // Torrent links (magnet / .torrent URL) open the torrent sheet, the rest the HTTP sheet.
+    val isTorrentLink = pendingUrl?.let {
+        it.startsWith("magnet:") || it.substringBefore('?').endsWith(".torrent", ignoreCase = true)
+    } == true
+    var showAdd by remember(pendingUrl) { mutableStateOf(pendingUrl != null && !isTorrentLink) }
+    var showTorrentAdd by remember(pendingUrl) { mutableStateOf(isTorrentLink) }
     var sortOpen by remember { mutableStateOf(false) }
     var confirmDeleteFile by remember { mutableStateOf<TaskRecord?>(null) }
     var duplicate by remember { mutableStateOf<DownloadsViewModel.Event.Duplicate?>(null) }
@@ -119,12 +126,15 @@ fun DownloadsScreen(
                     if (r == SnackbarResult.ActionPerformed) vm.undoTorrentDelete(e.record, e.row)
                 }
                 is DownloadsViewModel.Event.DeletedBatch -> {
+                    val total = e.records.size + e.torrentRecords.size
                     val r = snacks.showSnackbar(
-                        message = "Deleted ${e.records.size} downloads",
+                        message = "Deleted $total downloads",
                         actionLabel = "Undo",
                         duration = SnackbarDuration.Long,
                     )
-                    if (r == SnackbarResult.ActionPerformed) vm.undoDeleteBatch(e.records)
+                    if (r == SnackbarResult.ActionPerformed) {
+                        vm.undoDeleteBatch(e.records, e.torrentRecords, e.torrentRows)
+                    }
                 }
                 is DownloadsViewModel.Event.Deleted -> {
                     val r = snacks.showSnackbar(
@@ -147,6 +157,7 @@ fun DownloadsScreen(
         action()
     }
     fun startService(id: String) = withNotifPerm { DownloadService.start(ctx, id) }
+    fun startTorrentService(id: String) = withNotifPerm { DownloadService.startTorrent(ctx, id) }
 
     Scaffold(
         topBar = {
@@ -171,6 +182,9 @@ fun DownloadsScreen(
                     }
                     IconButton(onClick = { vm.exportUrls { shareText(ctx, it) } }) {
                         Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.export_list))
+                    }
+                    IconButton(onClick = { showTorrentAdd = true }) {
+                        Icon(Icons.Filled.CloudDownload, contentDescription = stringResource(R.string.add_torrent))
                     }
                 },
             )
@@ -294,18 +308,30 @@ fun DownloadsScreen(
                                 // Swipe right = pause/resume/open (snaps back); left = delete + Undo.
                                 val dismiss = rememberSwipeToDismissBoxState(
                                     confirmValueChange = { v ->
+                                        val torrent = row.record.kind == "torrent"
                                         when (v) {
                                             SwipeToDismissBoxValue.EndToStart -> {
-                                                vm.delete(id, deleteFile = false)
+                                                if (torrent) vm.deleteTorrent(id, deleteFile = false)
+                                                else vm.delete(id, deleteFile = false)
                                                 true
                                             }
                                             SwipeToDismissBoxValue.StartToEnd -> {
-                                                when (row.status) {
-                                                    TaskStatus.Downloading, TaskStatus.Queued -> vm.pause(id)
-                                                    TaskStatus.Paused, TaskStatus.Failed -> vm.retry(id, ::startService)
-                                                    TaskStatus.Completed ->
-                                                        openOrComplain(ctx, row.record) { vm.message(it) }
-                                                    else -> Unit
+                                                if (torrent) {
+                                                    when (row.status) {
+                                                        TaskStatus.Downloading, TaskStatus.Queued, TaskStatus.Seeding ->
+                                                            vm.pauseTorrent(id)
+                                                        TaskStatus.Paused, TaskStatus.Failed ->
+                                                            vm.retry(id, ::startTorrentService)
+                                                        else -> Unit
+                                                    }
+                                                } else {
+                                                    when (row.status) {
+                                                        TaskStatus.Downloading, TaskStatus.Queued -> vm.pause(id)
+                                                        TaskStatus.Paused, TaskStatus.Failed -> vm.retry(id, ::startService)
+                                                        TaskStatus.Completed ->
+                                                            openOrComplain(ctx, row.record) { vm.message(it) }
+                                                        else -> Unit
+                                                    }
                                                 }
                                                 false
                                             }
@@ -345,18 +371,31 @@ fun DownloadsScreen(
                                     DownloadCard(
                                         data = row.toCardData(),
                                         density = if (density == "compact") CardDensity.Compact else CardDensity.Comfortable,
-                                        onAction = {when (row.status) {
-                                                TaskStatus.Downloading, TaskStatus.Queued -> vm.pause(row.record.id)
-                                                TaskStatus.Paused, TaskStatus.Failed -> vm.retry(row.record.id, ::startService)
-                                                TaskStatus.Completed ->
-                                                    openOrComplain(ctx, row.record) { vm.message(it) }
-                                                else -> Unit
+                                        onAction = {
+                                            if (row.record.kind == "torrent") {
+                                                when (row.status) {
+                                                    TaskStatus.Downloading, TaskStatus.Queued, TaskStatus.Seeding ->
+                                                        vm.pauseTorrent(row.record.id)
+                                                    TaskStatus.Paused, TaskStatus.Failed ->
+                                                        vm.retry(row.record.id, ::startTorrentService)
+                                                    else -> Unit
+                                                }
+                                            } else {
+                                                when (row.status) {
+                                                    TaskStatus.Downloading, TaskStatus.Queued -> vm.pause(row.record.id)
+                                                    TaskStatus.Paused, TaskStatus.Failed -> vm.retry(row.record.id, ::startService)
+                                                    TaskStatus.Completed ->
+                                                        openOrComplain(ctx, row.record) { vm.message(it) }
+                                                    else -> Unit
+                                                }
                                             }
                                         },
                                         modifier = Modifier.fillMaxWidth(),
                                         onClick = {
                                             if (selection.isNotEmpty()) {
                                                 selection = if (id in selection) selection - id else selection + id
+                                            } else if (row.record.kind == "torrent") {
+                                                onTorrentDetails(id)
                                             } else {
                                                 onDetails(id)
                                             }
@@ -373,6 +412,29 @@ fun DownloadsScreen(
                                                 )
                                             }
                                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                            if (row.record.kind == "torrent") {
+                                                val link = row.record.url
+                                                if (link.startsWith("magnet:") || link.startsWith("http")) {
+                                                    DropdownMenuItem(
+                                                        text = { Text(stringResource(R.string.copy_link)) },
+                                                        onClick = { FileActions.copyLink(ctx, link); menu = false },
+                                                    )
+                                                }
+                                                if (row.status == TaskStatus.Failed) {
+                                                    DropdownMenuItem(
+                                                        text = { Text(stringResource(R.string.retry)) },
+                                                        onClick = { menu = false; vm.retry(row.record.id, ::startTorrentService) },
+                                                    )
+                                                }
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.delete)) },
+                                                    onClick = { menu = false; vm.deleteTorrent(row.record.id, deleteFile = false) },
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.delete_with_file)) },
+                                                    onClick = { menu = false; confirmDeleteFile = row.record },
+                                                )
+                                            } else {
                                             DropdownMenuItem(
                                                 text = { Text(stringResource(R.string.rename)) },
                                                 onClick = { menu = false; renameTarget = row.record },
@@ -399,6 +461,7 @@ fun DownloadsScreen(
                                                 text = { Text(stringResource(R.string.delete_with_file)) },
                                                 onClick = { menu = false; confirmDeleteFile = row.record },
                                             )
+                                            }
                                         }
                                         }
                                     }
@@ -414,6 +477,14 @@ fun DownloadsScreen(
 
     if (showAdd) {
         AddSheet(initialUrl = pendingUrl ?: "", onDismiss = { showAdd = false }, onStartService = ::startService, vm = vm)
+    }
+    if (showTorrentAdd) {
+        TorrentSheet(
+            initialUrl = if (isTorrentLink) pendingUrl ?: "" else "",
+            onDismiss = { showTorrentAdd = false },
+            onStartService = ::startTorrentService,
+            onTorrentDetails = { onTorrentDetails(it); showTorrentAdd = false },
+        )
     }
     duplicate?.let { d ->
         AlertDialog(
@@ -475,7 +546,13 @@ fun DownloadsScreen(
             title = { Text(stringResource(R.string.delete_file_title)) },
             text = { Text(stringResource(R.string.delete_file_text, rec.fileName)) },
             confirmButton = {
-                TextButton(onClick = { vm.delete(rec.id, deleteFile = true); confirmDeleteFile = null }) {
+                TextButton(
+                    onClick = {
+                        if (rec.kind == "torrent") vm.deleteTorrent(rec.id, deleteFile = true)
+                        else vm.delete(rec.id, deleteFile = true)
+                        confirmDeleteFile = null
+                    },
+                ) {
                     Text(stringResource(R.string.delete))
                 }
             },

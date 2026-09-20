@@ -224,23 +224,42 @@ class DownloadsViewModel @Inject constructor(
     }
 
     fun pauseIds(ids: Set<String>) {
-        viewModelScope.launch { ids.forEach { repo.pause(it) } }
+        viewModelScope.launch {
+            ids.forEach { if (repo.get(it)?.kind == "torrent") trepo.cancelTorrent(it) else repo.pause(it) }
+        }
     }
 
     fun deleteIds(ids: Set<String>, deleteFile: Boolean) {
         viewModelScope.launch {
             val recs = ids.mapNotNull { repo.get(it) }
-            recs.forEach { repo.delete(it.id, deleteFile) }
-            if (!deleteFile && recs.isNotEmpty()) _events.send(Event.DeletedBatch(recs))
+            val (tor, http) = recs.partition { it.kind == "torrent" }
+            http.forEach { repo.delete(it.id, deleteFile) }
+            val trows = tor.mapNotNull { r ->
+                val row = trepo.torrentRow(r.id)
+                trepo.deleteTorrent(r.id, deleteFile)
+                row
+            }
+            if (!deleteFile && (http.isNotEmpty() || trows.isNotEmpty())) {
+                _events.send(Event.DeletedBatch(http, tor, trows))
+            }
         }
     }
 
-    fun undoDeleteBatch(recs: List<TaskRecord>) {
-        viewModelScope.launch { recs.forEach { repo.restore(it) } }
+    fun undoDeleteBatch(recs: List<TaskRecord>, torRecs: List<TaskRecord>, rows: List<TorrentTask>) {
+        viewModelScope.launch {
+            recs.forEach { repo.restore(it) }
+            torRecs.zip(rows).forEach { (rec, row) -> trepo.restoreTorrent(rec, row) }
+        }
     }
 
     fun moveIdsToCategory(ids: Set<String>, categoryId: String) {
-        viewModelScope.launch { ids.forEach { repo.setCategory(it, categoryId) } }
+        // Torrents stay put: moving live session files breaks seeding (P4d move-storage).
+        viewModelScope.launch {
+            ids.forEach {
+                val r = repo.get(it)
+                if (r != null && r.kind != "torrent") repo.setCategory(it, categoryId)
+            }
+        }
     }
 
     fun rename(id: String, name: String) {
@@ -292,7 +311,11 @@ class DownloadsViewModel @Inject constructor(
     sealed interface Event {
         data class Message(val text: String) : Event
         data class Deleted(val record: TaskRecord) : Event
-        data class DeletedBatch(val records: List<TaskRecord>) : Event
+        data class DeletedBatch(
+            val records: List<TaskRecord>,
+            val torrentRecords: List<TaskRecord> = emptyList(),
+            val torrentRows: List<TorrentTask> = emptyList(),
+        ) : Event
         data class TorrentDeleted(val record: TaskRecord, val row: TorrentTask) : Event
         data class Duplicate(val url: String, val name: String?, val categoryId: String?, val recordId: String) : Event
     }
