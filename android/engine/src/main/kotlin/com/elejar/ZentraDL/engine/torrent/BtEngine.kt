@@ -152,7 +152,7 @@ class BtEngine(
             ?: throw IllegalArgumentException("magnet or torrentBytes required")
         val pieceLength = spec.torrentBytes?.let { metaService.fromByteArray(it).chunkSize }
             ?: spec.pieceLength
-        return BtSession(rt, client, idHex, pieceLength)
+        return BtSession(rt, client, idHex, pieceLength, spec.saveDir)
     }
 
     private fun toMeta(t: Torrent, magnet: String?): TorrentMeta {
@@ -186,6 +186,7 @@ class BtSession internal constructor(
     private val client: BtClient,
     val idHex: String,
     private val pieceLength: Long,
+    val saveDir: File,
 ) {
     private val _stats = MutableStateFlow(
         TorrentStats(0, 0, -1, 0, 0, 0, 0, 0, TorrentRunState.FETCHING),
