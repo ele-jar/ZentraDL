@@ -1,0 +1,51 @@
+# Android / Gradle
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+android/build/
+android/*/build/
+android/.gradle/
+*.hprof
+.cxx/
+.kotlin/
+build/
+
+# APK / AAB outputs (copied to dist/ manually, never committed)
+*.apk
+*.aab
+*.apks
+dist/
+*.jks
+*.keystore
+*.p8
+google-services.json
+
+# Go / gomobile
+*.so
+*.aar
+core/bin/
+core/dist/
+
+# Toolchains inside repo (per BRIEF 13.4)
+.toolchain/
+.gradle-home/
+gradle-home/
+
+# Logs
+.logs/
+*.log
+
+# IDE
+.vscode/
+*.swp
+*~
+
+# OS
+Thumbs.db
+
+# Secrets
+local.properties
+*.env
+secrets/

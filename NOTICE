@@ -1,0 +1,10 @@
+ZentraDL (com.elejar.ZentraDL) — GPL-3.0-or-later. See LICENSE.
+
+Third-party attributions (full texts via AboutLibraries screen + licenses/ dir):
+- Gopeed (github.com/GopeedLab/gopeed, GPL-3.0) — download engine core (core/ fork).
+  Upstream copyright headers and license files preserved.
+- anacrolix/torrent (+ dht, go-libutp, upnp) — BitTorrent implementation (via Gopeed).
+- LibreTorrent (GPL) — studied for torrent UX behaviour; clean re-implementation
+  with attribution, no copied assets.
+- AndroidX / Jetpack Compose / Material 3, Hilt, Coil, Media3, WorkManager —
+  Apache-2.0. Feature ideas only from 1DM+ (no code, name, icons, strings, artwork).
