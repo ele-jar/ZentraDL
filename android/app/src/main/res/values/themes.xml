@@ -1,0 +1,6 @@
+<resources>
+    <!-- Phase 0 skeleton theme. Full M3 dynamic+fallback palettes land in Phase 2 (:designsystem). -->
+    <style name="Theme.ZentraDL" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

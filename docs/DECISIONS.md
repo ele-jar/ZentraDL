@@ -18,3 +18,12 @@ manual .gitmodules worked.
 ## D004 (2026-09-20) — CI calls `gradle`, not `./gradlew`
 No wrapper jar in repo (binary, would need download); `gradle/actions/setup-gradle`
 provides Gradle 9.6.0 in CI. AGENTS.md + README updated; wrapper may come in Phase 1.
+
+## D005 (2026-09-20) — Kotlin 2.3.21 + KSP 2.3.12 (not 2.4.20), AGP 9.4.1
+First CI run failed before compiling: `android-actions/setup-android` installs
+obsolete `tools` package (exit 1) → replaced with manual sdkmanager step.
+While fixing, verified every version against Maven metadata: KSP has NO 2.4 line
+(latest 2.3.12, new scheme), so Kotlin 2.4.20 would have broken KSP/Hilt/Room.
+Downgraded Kotlin → 2.3.21; AGP → 9.4.1; added activity-compose 1.13.0; real
+minimal MainActivity + themes.xml so the skeleton compiles. Re-upgrade Kotlin
+when KSP 2.4.x ships.

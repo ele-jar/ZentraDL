@@ -37,6 +37,8 @@ dependencies {
     implementation(project(":engine"))
     implementation(project(":designsystem"))
     implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.activity.compose)
     implementation(libs.material3)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

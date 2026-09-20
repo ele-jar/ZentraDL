@@ -7,11 +7,11 @@ Do NOT upgrade past these without re-verifying. minSdk 26 throughout.
 
 | Library | Verified stable version | Source URL | Notes |
 |---|---|---|---|
-| AGP | 9.4.0 (Sep 2026) | https://developer.android.com/build/releases/agp-9-4-0-release-notes | Requires Gradle 9.6.0, JDK 17; max API 37. Minimum for Compose 1.12 stack is 9.2.0 |
-| Gradle | 9.6.0 | https://developer.android.com/build/releases/agp-9-4-0-release-notes | AGP 9.4 default/ minimum |
-| Kotlin | 2.4.20 (Sep 7, 2026) | https://kotlinlang.org/docs/whatsnew2420.html | K2 only; `-language-version 1.9`/K1 unsupported since 2.4 |
-| Compose compiler plugin | 2.4.20 (`org.jetbrains.kotlin.plugin.compose`) | https://mvnrepository.com/artifact/org.jetbrains.kotlin.plugin.compose/org.jetbrains.kotlin.plugin.compose.gradle.plugin | Ships with Kotlin; version == Kotlin version |
-| KSP | match Kotlin prefix (2.4.20 build; latest indexed stable 2.3.11, Aug 2026) | https://github.com/google/ksp/releases | KSP version string is `<kotlin-ver>-<ksp-ver>`; confirm exact 2.4.20 build on google/ksp at setup |
+| AGP | 9.4.1 (Sep 2026) | https://developer.android.com/build/releases/agp-9-4-0-release-notes | Requires Gradle 9.6.0, JDK 17; max API 37. Minimum for Compose 1.12 stack is 9.2.0 |
+| Gradle | 9.6.0 (pinned via `gradle-version` in CI; no wrapper jar in repo) | https://services.gradle.org/distributions/ | setup-gradle installs it; 9.7.1 is current but 9.6.0 is AGP 9.4's floor |
+| Kotlin | 2.3.21 (Sep 2026) | https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-gradle-plugin/maven-metadata.xml | DOWNGRADED from 2.4.20: KSP has no 2.4 line (latest 2.3.12). Re-upgrade when KSP 2.4.x ships |
+| Compose compiler plugin | 2.3.21 (`org.jetbrains.kotlin.plugin.compose`) | https://mvnrepository.com/artifact/org.jetbrains.kotlin.plugin.compose/org.jetbrains.kotlin.plugin.compose.gradle.plugin | Ships with Kotlin; version == Kotlin version |
+| KSP | 2.3.12 (new versioning scheme; latest 2026-09-09) | https://repo1.maven.org/maven2/com/google/devtools/ksp/com.google.devtools.ksp.gradle.plugin/maven-metadata.xml | No 2.4.x exists — this pins Kotlin to 2.3.x (D005) |
 | compileSdk | 37 | https://developer.android.com/jetpack/androidx/releases/hilt / Compose Aug-26 notes | Forced by Compose BOM 2026.08.00 / Compose 1.12 |
 | targetSdk | 36 (Android 16, Baklava) | https://developer.android.com/about/versions/16/setup-sdk + https://targetsdk.com/ | Play requires target ≥36 for new apps/updates since Aug 31, 2026; target 37 optional |
 | build-tools | 36.0.0 | https://developer.android.com/build/releases/agp-9-4-0-release-notes | AGP 9.4 default |
@@ -21,7 +21,8 @@ Do NOT upgrade past these without re-verifying. minSdk 26 throughout.
 
 | Library | Verified stable version | Source URL | Notes |
 |---|---|---|---|
-| Compose BOM | 2026.08.00 (Compose 1.12, Aug 12, 2026) | https://developer.android.com/develop/ui/compose/bom + https://mvnrepository.com/artifact/androidx.compose/compose-bom/2026.08.00 | Requires compileSdk 37 + AGP ≥9.2.0 |
+| Compose BOM | 2026.08.00 (Compose 1.12, Aug 12, 2026) | https://developer.android.com/develop/ui/compose/bom + https://mvnrepository.com/artifact/androidx.compose/compose-bom/2026.08.00 | Requires compileSdk 37 + AGP ≥9.2.0; compiled with Kotlin 2.3.21 plugin (D005) |
+| activity-compose | 1.13.0 stable (Sep 2026) | https://dl.google.com/dl/android/maven2/androidx/activity/activity-compose/maven-metadata.xml | For ComponentActivity.setContent |
 | Material3 (Compose) | 1.4.0 stable (1.5.0-alpha27 latest alpha) | https://developer.android.com/jetpack/androidx/releases/compose-material3 | Use 1.4.0; M3 Expressive APIs partly experimental |
 | Hilt (Dagger) | 2.60.1 (Jul 2026) | https://dagger.dev/ + https://github.com/google/dagger/releases | First AGP-9-compatible line; skip 2.59 (ComponentTreeDeps bug); minSdk now 23 — OK for our 26 |
 | androidx.hilt | 1.4.0 (Jul 1, 2026) | https://developer.android.com/jetpack/androidx/releases/hilt | navigation-compose + work extensions; KGP ≥2.2.0 |
