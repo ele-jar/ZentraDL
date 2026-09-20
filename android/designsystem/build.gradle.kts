@@ -12,7 +12,9 @@ android {
 }
 dependencies {
     implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
     implementation(libs.material3)
+    implementation(libs.icons.extended)
     testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi)
 }
