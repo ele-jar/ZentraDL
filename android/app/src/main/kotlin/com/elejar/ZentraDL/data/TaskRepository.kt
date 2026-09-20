@@ -51,11 +51,24 @@ class TaskRepository @Inject constructor(
 
     suspend fun get(id: String): TaskRecord? = dao.get(id)
 
+    suspend fun probe(url: String) = downloader.probe(url, emptyMap())
+
+    suspend fun restore(record: TaskRecord) {
+        dao.insert(record)
+    }
+
+    /** Pause one task: running -> paused via cancel; waiting -> paused explicitly. */
+    suspend fun pause(id: String) {
+        cancel(id)
+        if (dao.get(id)?.status == "queued") dao.updateStatus(id, "paused")
+    }
+
     fun hasRunning(): Boolean = jobs.isNotEmpty()
 
-    suspend fun enqueue(url: String): String {
+    suspend fun enqueue(url: String, name: String? = null): String {
         val id = UUID.randomUUID().toString()
-        val guess = url.substringAfterLast('/').substringBefore('?').ifBlank { "download" }
+        val guess = name?.takeIf { it.isNotBlank() }
+            ?: url.substringAfterLast('/').substringBefore('?').ifBlank { "download" }
         dao.insert(
             TaskRecord(
                 id = id, url = url, fileName = guess,
