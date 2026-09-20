@@ -47,9 +47,12 @@ data class BtOptions(
 /**
  * JVM torrent engine over atomashpolskiy/bt 1.10 (P4a).
  *
- * One shared [BtRuntime] (single DHT socket); one [BtClient] per torrent.
- * Finished clients keep seeding until [BtSession.stop]. Rates are sampled
- * here — bt exposes totals only. No Android imports (JVM-testable).
+ * One shared [BtRuntime] (single DHT socket) with automatic shutdown DISABLED:
+ * bare `BtClient.stop()` only detaches, so fetch-temp clients and pause/resume
+ * are safe. Finished clients keep seeding until [BtSession.stop]. Paused
+ * sessions resume on the SAME client (stop empties the guards; restart
+ * re-verifies automatically). Rates are sampled here — bt exposes totals only.
+ * No Android imports (JVM-testable).
  */
 class BtEngine(
     private val opts: BtOptions = BtOptions(),
@@ -66,15 +69,16 @@ class BtEngine(
         if (opts.bindHost != null) config.acceptorAddress = java.net.InetAddress.getByName(opts.bindHost)
         config.maxPeerConnectionsPerTorrent = opts.maxPeersPerTorrent
         config.numOfHashingThreads = opts.hashingThreads
-        val builder = BtRuntime.builder(config).disableLocalServiceDiscovery()
+        val builder = BtRuntime.builder(config)
+            .disableLocalServiceDiscovery()
+            .disableAutomaticShutdown()
         if (opts.enableDht) {
             val dht = DHTConfig()
             dht.listeningPort = opts.dhtPort
             dht.setShouldUseRouterBootstrap(true)
             builder.module(DHTModule(dht))
         }
-        builder.module(HttpTrackerModule())
-        runtime = builder.build().also { it.startup() }
+        runtime = builder.module(HttpTrackerModule()).build().also { it.startup() }
     }
 
     @Synchronized
@@ -98,7 +102,7 @@ class BtEngine(
     fun parseTorrentBytes(bytes: ByteArray): TorrentMeta = toMeta(metaService.fromByteArray(bytes), null)
 
     /**
-     * Fetch magnet metadata (own timeout; client stopped after). Returns the
+     * Fetch magnet metadata (own timeout; temp client detached after). Returns the
      * exchanged bytes too, so restarts don't re-fetch. Throws [MetadataTimeoutException].
      */
     suspend fun fetchMetadata(magnet: String, timeoutMs: Long = 60_000): FetchedMeta =
@@ -119,7 +123,7 @@ class BtEngine(
             } catch (e: TimeoutCancellationException) {
                 throw MetadataTimeoutException(magnet)
             } finally {
-                client.stop()
+                runCatching { client.stop() }
             }
         }
 
@@ -172,7 +176,7 @@ class BtEngine(
     private fun joinPath(f: TorrentFile): String = f.pathElements.joinToString("/")
 }
 
-/** Live handle for one torrent (stats flow, pieces, peers, priority, stop). */
+/** Live handle for one torrent (stats flow, pieces, peers, priority, stop/resume). */
 class BtSession internal constructor(
     private val runtime: BtRuntime,
     private val client: BtClient,
@@ -192,14 +196,17 @@ class BtSession internal constructor(
     @Volatile private var prevUp = -1L
     @Volatile private var prevAt = -1L
     @Volatile private var stopped = false
-    @Volatile private var failed: String? = null
 
     init {
+        startListening()
+    }
+
+    private fun startListening() {
         val future: CompletableFuture<*> = client.startAsync({ s -> onState(s) }, 1000L)
         future.whenComplete { _, e ->
             if (e != null && !stopped) {
-                failed = e.message ?: e.toString()
-                _error.value = failed
+                val msg = e.message ?: e.toString()
+                _error.value = msg
                 _stats.value = _stats.value.copy(state = TorrentRunState.FAILED)
             }
         }
@@ -267,10 +274,18 @@ class BtSession internal constructor(
             if (joinPath(f) in paths) UpdatedFilePriority.HIGH_PRIORITY else UpdatedFilePriority.NORMAL_PRIORITY
         }
 
+    /** Pause (data kept; [resume] restarts on the same client). */
     fun stop() {
         stopped = true
-        client.stop()
+        runCatching { client.stop() }
         _stats.value = _stats.value.copy(state = TorrentRunState.PAUSED)
+    }
+
+    /** Resume a stopped session. */
+    fun resume() {
+        stopped = false
+        _error.value = null
+        startListening()
     }
 
     private fun joinPath(f: TorrentFile): String = f.pathElements.joinToString("/")
