@@ -94,7 +94,7 @@ class HlsDownloader(
                 emit(DownloadProgress(done, estTotal, rate))
             }
         }
-        emit(DownloadProgress(done, if (estTotal > 0) estTotal else done, 0))
+        emit(DownloadProgress(done, done, 0))
     }.flowOn(ioDispatcher)
 
     private fun parseSegments(text: String, base: String): Pair<List<HlsSegment>, Int> {
