@@ -18,8 +18,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Foreground service that exists ONLY while a download runs (P1 skeleton:
@@ -54,8 +56,11 @@ class DownloadService : Service() {
                 }
             }
             ACTION_STOP -> {
-                repo.cancelAll()
-                stopSelf()
+                // NonCancellable: onDestroy cancels our scope, but the stop must land first.
+                scope.launch {
+                    withContext(NonCancellable) { repo.cancelAll() }
+                    stopSelf()
+                }
             }
         }
         return START_NOT_STICKY

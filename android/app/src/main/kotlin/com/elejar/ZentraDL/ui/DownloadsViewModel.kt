@@ -44,6 +44,14 @@ class DownloadsViewModel @Inject constructor(
     }
 
     fun stopAll() {
-        repo.cancelAll()
+        viewModelScope.launch { repo.cancelAll() }
+    }
+
+    fun pauseAll() {
+        viewModelScope.launch { repo.pauseAll() }
+    }
+
+    fun resumeAll() {
+        viewModelScope.launch { repo.resumeAll() }
     }
 }

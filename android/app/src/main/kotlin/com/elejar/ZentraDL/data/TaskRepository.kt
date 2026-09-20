@@ -88,13 +88,27 @@ class TaskRepository @Inject constructor(
         jobs.getOrPut(id) { appScope.launch { runInternal(id) } }.join()
     }
 
-    fun cancel(id: String) {
+    /** Cancel a running task (-> paused) or drop a queued waiter (-> stays queued). */
+    suspend fun cancel(id: String) {
         jobs.remove(id)?.cancel()
+        queueMutex.withLock {
+            val i = waiters.indexOfFirst { it.first == id }
+            if (i >= 0) {
+                waiters.removeAt(i).second.completeExceptionally(CancellationException("cancelled while queued"))
+            }
+        }
+        pump()
     }
 
-    fun cancelAll() {
-        jobs.values.forEach { it.cancel() }
-        jobs.clear()
+    suspend fun cancelAll() {
+        jobs.keys.toList().forEach { jobs.remove(it)?.cancel() }
+        queueMutex.withLock {
+            waiters.removeAll { (_, gate) ->
+                gate.completeExceptionally(CancellationException("cancelled while queued"))
+                true
+            }
+        }
+        pump()
     }
 
     /** Delete record (and file when [deleteFile]). Queued waiters are released first. */
@@ -109,7 +123,17 @@ class TaskRepository @Inject constructor(
         pump()
     }
 
+    /** Pause everything: waiting tasks are dropped back to paused, running ones cancel. */
     suspend fun pauseAll() {
+        val waiting = queueMutex.withLock {
+            val ids = waiters.map { it.first }
+            waiters.removeAll { (_, gate) ->
+                gate.completeExceptionally(CancellationException("paused"))
+                true
+            }
+            ids
+        }
+        waiting.forEach { dao.updateStatus(it, "paused") }
         jobs.keys.toList().forEach { cancel(it) }
     }
 
