@@ -72,7 +72,7 @@ class TorrentEngineTest {
         val magnet = "magnet:?xt=urn:btih:${meta.idHex}&x.pe=127.0.0.1:$seedPort"
         assertThat(magnet).startsWith("magnet:?")
         // Sanity: our own parser round-trips it, peer hint intact.
-        val ref = leecher.parseMagnet(magnet)
+        val ref = BtEngine(BtOptions(enableDht = false)).parseMagnet(magnet)
         assertThat(ref.idHex).isEqualTo(meta.idHex)
         assertThat(ref.peers.map { "${it.hostname}:${it.port}" }).containsExactly("127.0.0.1:$seedPort")
 
