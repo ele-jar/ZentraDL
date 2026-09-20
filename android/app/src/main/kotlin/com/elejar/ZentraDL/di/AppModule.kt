@@ -8,9 +8,11 @@ import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.local.AppDatabase
 import com.elejar.ZentraDL.data.local.CategoryDao
 import com.elejar.ZentraDL.data.local.TaskDao
+import com.elejar.ZentraDL.data.local.TorrentTaskDao
 import com.elejar.ZentraDL.engine.http.HttpDownloader
 import com.elejar.ZentraDL.engine.http.SpeedLimiter
 import com.elejar.ZentraDL.engine.model.Downloader
+import com.elejar.ZentraDL.engine.torrent.BtEngine
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,7 +33,7 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
         Room.databaseBuilder(ctx, AppDatabase::class.java, "zentradl.db")
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
             .build()
 
     @Provides
@@ -39,6 +41,13 @@ object AppModule {
 
     @Provides
     fun provideCategoryDao(db: AppDatabase): CategoryDao = db.categoryDao()
+
+    @Provides
+    fun provideTorrentTaskDao(db: AppDatabase): TorrentTaskDao = db.torrentTaskDao()
+
+    @Provides
+    @Singleton
+    fun provideBtEngine(): BtEngine = BtEngine()
 
     @Provides
     @Singleton

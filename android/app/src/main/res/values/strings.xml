@@ -109,6 +109,7 @@
     <string name="waiting_wifi">Waiting for Wi-Fi — metered connection held.</string>
     <string name="waiting_charger">Waiting for charger.</string>
     <string name="scheduled_starts">Scheduled · starts %1$s.</string>
+    <string name="seeding_notif">Seeding · ↑ %1$s</string>
     <string name="privacy_section">Privacy &amp; security</string>
     <string name="app_lock">App lock</string>
     <string name="app_lock_title">Unlock ZentraDL</string>

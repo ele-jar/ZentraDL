@@ -3,8 +3,10 @@ package com.elejar.ZentraDL.ui
 import com.elejar.ZentraDL.data.DuplicateTask
 import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
+import com.elejar.ZentraDL.data.TorrentRepository
 import com.elejar.ZentraDL.data.local.Category
 import com.elejar.ZentraDL.data.local.TaskRecord
+import com.elejar.ZentraDL.data.local.TorrentTask
 import com.elejar.ZentraDL.domain.GateBlock
 import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.ResourceInfo
@@ -25,6 +27,7 @@ import androidx.lifecycle.viewModelScope
 @HiltViewModel
 class DownloadsViewModel @Inject constructor(
     private val repo: TaskRepository,
+    private val trepo: TorrentRepository,
     private val settings: SettingsStore,
 ) : ViewModel() {
 
@@ -50,11 +53,15 @@ class DownloadsViewModel @Inject constructor(
     val items: StateFlow<List<DownloadsUi.ListItem>> = combine(
         combine(repo.records, repo.progress, query, filter, sort, ::ListInputs),
         category,
-    ) { i, c ->
-        DownloadsUi.buildList(i.records, i.progress, i.query, i.filter, sortOf(i.sort), categoryId = c)
+        allProgress,
+    ) { i, c, tp ->
+        DownloadsUi.buildList(i.records, i.progress + tp, i.query, i.filter, sortOf(i.sort), categoryId = c)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val header: StateFlow<HeaderUi> = combine(repo.records, repo.progress, repo.gateBlock) { records, progress, block ->
+    /** HTTP + torrent live progress in one map (torrent stats converted). */
+    private val allProgress = combine(repo.progress, trepo.tprogress) { h, t -> h + t }
+
+    val header: StateFlow<HeaderUi> = combine(repo.records, allProgress, repo.gateBlock) { records, progress, block ->
         val down = progress.values.sumOf { it.bytesPerSecond }
         HeaderUi(
             downSpeed = down,
@@ -178,6 +185,23 @@ class DownloadsViewModel @Inject constructor(
         viewModelScope.launch { repo.pause(id) }
     }
 
+    fun pauseTorrent(id: String) {
+        viewModelScope.launch { trepo.cancelTorrent(id) }
+    }
+
+    fun deleteTorrent(id: String, deleteFiles: Boolean) {
+        viewModelScope.launch {
+            val rec = repo.get(id) ?: return@launch
+            val row = trepo.torrentRow(id)
+            trepo.deleteTorrent(id, deleteFiles)
+            if (!deleteFiles && row != null) _events.send(Event.TorrentDeleted(rec, row))
+        }
+    }
+
+    fun undoTorrentDelete(rec: TaskRecord, row: TorrentTask) {
+        viewModelScope.launch { trepo.restoreTorrent(rec, row) }
+    }
+
     fun retry(id: String, onStart: (String) -> Unit) {
         onStart(id)
     }
@@ -196,6 +220,7 @@ class DownloadsViewModel @Inject constructor(
 
     fun pauseAll() {
         viewModelScope.launch { repo.pauseAll() }
+        trepo.pauseAllTorrents()
     }
 
     fun pauseIds(ids: Set<String>) {
@@ -230,10 +255,12 @@ class DownloadsViewModel @Inject constructor(
 
     fun resumeAll() {
         viewModelScope.launch { repo.resumeAll() }
+        viewModelScope.launch { trepo.resumeAllTorrents() }
     }
 
     fun stopAll() {
         viewModelScope.launch { repo.cancelAll() }
+        trepo.pauseAllTorrents()
     }
 
     private fun sortOf(s: String): DownloadsUi.SortMode = when (s) {
@@ -266,6 +293,7 @@ class DownloadsViewModel @Inject constructor(
         data class Message(val text: String) : Event
         data class Deleted(val record: TaskRecord) : Event
         data class DeletedBatch(val records: List<TaskRecord>) : Event
+        data class TorrentDeleted(val record: TaskRecord, val row: TorrentTask) : Event
         data class Duplicate(val url: String, val name: String?, val categoryId: String?, val recordId: String) : Event
     }
 }

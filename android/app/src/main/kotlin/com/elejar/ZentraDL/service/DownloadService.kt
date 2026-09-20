@@ -14,6 +14,7 @@ import com.elejar.ZentraDL.DownloadChannels
 import com.elejar.ZentraDL.MainActivity
 import com.elejar.ZentraDL.R
 import com.elejar.ZentraDL.data.TaskRepository
+import com.elejar.ZentraDL.data.TorrentRepository
 import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.ui.Format
 import dagger.hilt.android.AndroidEntryPoint
@@ -38,6 +39,7 @@ import kotlinx.coroutines.withContext
 class DownloadService : Service() {
 
     @Inject lateinit var repo: TaskRepository
+    @Inject lateinit var trepo: TorrentRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val notifIds = mutableMapOf<String, Int>()
@@ -63,14 +65,32 @@ class DownloadService : Service() {
                     finishTask(id)
                 }
             }
+            ACTION_RUN_TORRENT -> {
+                val id = intent.getStringExtra(EXTRA_ID) ?: return START_NOT_STICKY
+                ensureFg(progressNotification(id, trepoName(id), null))
+                scope.launch {
+                    val watcher = launch { watchTorrent(id, trepoName(id)) }
+                    try {
+                        trepo.runTorrent(id)
+                    } finally {
+                        watcher.cancel()
+                    }
+                    finishTorrent(id)
+                }
+            }
             ACTION_STOP_TASK -> {
                 intent.getStringExtra(EXTRA_ID)?.let { id ->
-                    scope.launch { repo.cancel(id) }
+                    scope.launch {
+                        if (repo.get(id)?.kind == "torrent") trepo.cancelTorrent(id) else repo.cancel(id)
+                    }
                 }
             }
             ACTION_STOP -> {
                 scope.launch {
-                    withContext(NonCancellable) { repo.cancelAll() }
+                    withContext(NonCancellable) {
+                        repo.cancelAll()
+                        trepo.pauseAllTorrents()
+                    }
                     stopSelf()
                 }
             }
@@ -84,12 +104,29 @@ class DownloadService : Service() {
         val rec = repo.get(id)
         when (rec?.status) {
             "completed" -> showCompleted(rec)
-            "failed" -> showFailed(id, rec.fileName, rec.error)
+            "failed" -> showFailed(id, rec.fileName, rec.error, ACTION_RUN)
             else -> Unit // paused/cancelled: stay quiet
         }
         updateSummary()
-        if (!repo.hasRunning()) stopSelf()
+        if (!repo.hasRunning() && !trepo.hasActive()) stopSelf()
     }
+
+    /** Torrent runs park while seeding (ongoing notification kept); pause/failed end it. */
+    private suspend fun finishTorrent(id: String) {
+        val rec = repo.get(id)
+        when (rec?.status) {
+            "seeding" -> postNotification(id, seedingNotification(id, rec.fileName))
+            "failed" -> {
+                cancelNotification(id)
+                showFailed(id, rec.fileName, rec.error, ACTION_RUN_TORRENT)
+            }
+            else -> cancelNotification(id) // paused/cancelled: stay quiet
+        }
+        updateSummary()
+        if (!repo.hasRunning() && !trepo.hasActive()) stopSelf()
+    }
+
+    private suspend fun trepoName(id: String): String = repo.get(id)?.fileName ?: "Torrent"
 
     private suspend fun watchProgress(id: String, title: String) {
         var lastPct = -1
@@ -103,6 +140,35 @@ class DownloadService : Service() {
             postNotification(id, progressNotification(id, title, p))
             updateSummary()
         }
+    }
+
+    private suspend fun watchTorrent(id: String, title: String) {
+        var lastPct = -1
+        var lastAt = 0L
+        trepo.tprogress.collect { map ->
+            val p = map[id] ?: return@collect
+            val now = System.currentTimeMillis()
+            if (p.percent == lastPct || now - lastAt < 1000) return@collect
+            lastPct = p.percent
+            lastAt = now
+            postNotification(id, progressNotification(id, title, p))
+            updateSummary()
+        }
+    }
+
+    private fun seedingNotification(id: String, title: String): Notification {
+        val stop = serviceIntent(ACTION_STOP_TASK, id, 0)
+        val s = trepo.statsOf(id)
+        val up = s?.let { com.elejar.ZentraDL.ui.Format.speed(it.upRate, it.upRate > 0) } ?: ""
+        return NotificationCompat.Builder(this, DownloadChannels.ACTIVE)
+            .setContentTitle(title)
+            .setContentText(getString(R.string.seeding_notif, up))
+            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setOngoing(true)
+            .setGroup(GROUP)
+            .setContentIntent(contentIntent())
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.stop), stop)
+            .build()
     }
 
     private fun progressNotification(id: String, title: String, p: DownloadProgress?): Notification {
@@ -158,8 +224,8 @@ class DownloadService : Service() {
         notify(terminalId(), n)
     }
 
-    private fun showFailed(id: String, name: String, error: String?) {
-        val retry = serviceIntent(ACTION_RUN, id, id.hashCode())
+    private fun showFailed(id: String, name: String, error: String?, retryAction: String) {
+        val retry = serviceIntent(retryAction, id, id.hashCode())
         val n = NotificationCompat.Builder(this, DownloadChannels.FAILED)
             .setContentTitle(name)
             .setContentText(error ?: getString(R.string.download_failed))
@@ -173,7 +239,7 @@ class DownloadService : Service() {
     }
 
     private suspend fun updateSummary() {
-        val map = repo.progress.value
+        val map = repo.progress.value + trepo.tprogress.value
         val total = map.values.sumOf { it.bytesPerSecond }
         val count = map.size
         val text = if (count == 0) "" else "$count downloading · ${Format.speed(total, total > 0)}"
@@ -257,6 +323,7 @@ class DownloadService : Service() {
 
     companion object {
         const val ACTION_RUN = "com.elejar.ZentraDL.action.RUN"
+        const val ACTION_RUN_TORRENT = "com.elejar.ZentraDL.action.RUN_TORRENT"
         const val ACTION_STOP = "com.elejar.ZentraDL.action.STOP"
         const val ACTION_STOP_TASK = "com.elejar.ZentraDL.action.STOP_TASK"
         private const val EXTRA_ID = "task_id"
@@ -268,6 +335,11 @@ class DownloadService : Service() {
 
         fun start(ctx: Context, taskId: String) {
             val i = Intent(ctx, DownloadService::class.java).setAction(ACTION_RUN).putExtra(EXTRA_ID, taskId)
+            androidx.core.content.ContextCompat.startForegroundService(ctx, i)
+        }
+
+        fun startTorrent(ctx: Context, taskId: String) {
+            val i = Intent(ctx, DownloadService::class.java).setAction(ACTION_RUN_TORRENT).putExtra(EXTRA_ID, taskId)
             androidx.core.content.ContextCompat.startForegroundService(ctx, i)
         }
     }

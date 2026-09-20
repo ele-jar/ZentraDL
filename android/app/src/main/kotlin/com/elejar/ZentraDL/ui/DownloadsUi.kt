@@ -31,6 +31,7 @@ object DownloadsUi {
         "queued" -> TaskStatus.Queued
         "paused" -> TaskStatus.Paused
         "completed" -> TaskStatus.Completed
+        "seeding" -> TaskStatus.Seeding
         else -> TaskStatus.Failed
     }
 

@@ -23,6 +23,8 @@ data class TaskRecord(
     val error: String? = null,
     /** Category id (see [Category]); "other" when uncategorized. */
     val categoryId: String = "other",
+    /** "http" or "torrent" (P4). */
+    val kind: String = "http",
     /** True when moved to the private vault (P3e; hidden from the main list). */
     val vaulted: Boolean = false,
     /** Expected SHA-256 hex for manual verification (null = not set). */
@@ -72,4 +74,39 @@ interface TaskDao {
 
     @Query("UPDATE tasks SET expectedSha256 = :sha256 WHERE id = :id")
     suspend fun updateExpectedSha(id: String, sha256: String?)
+}
+
+/**
+ * Torrent extras keyed by info-hash (== [TaskRecord.id]). Transfer state
+ * lives in [BtSession][com.elejar.ZentraDL.engine.torrent.BtSession].
+ */
+@Entity(tableName = "torrent_tasks")
+data class TorrentTask(
+    @PrimaryKey val id: String,
+    val magnet: String?,
+    /** Persisted .torrent bytes (app-private torrents/); null when never had them. */
+    val torrentPath: String?,
+    /** CSV of wanted file paths; empty = all. */
+    val selectedPaths: String = "",
+    val sequential: Boolean = false,
+    val name: String = "",
+    val sizeBytes: Long = -1,
+)
+
+@Dao
+interface TorrentTaskDao {
+    @Query("SELECT * FROM torrent_tasks WHERE id = :id")
+    suspend fun get(id: String): TorrentTask?
+
+    @Query("SELECT * FROM torrent_tasks WHERE id = :id")
+    fun observe(id: String): Flow<TorrentTask?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(task: TorrentTask)
+
+    @Query("UPDATE torrent_tasks SET selectedPaths = :paths WHERE id = :id")
+    suspend fun updateSelection(id: String, paths: String)
+
+    @Query("DELETE FROM torrent_tasks WHERE id = :id")
+    suspend fun delete(id: String)
 }

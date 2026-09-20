@@ -5,10 +5,11 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [TaskRecord::class, Category::class], version = 3, exportSchema = false)
+@Database(entities = [TaskRecord::class, Category::class, TorrentTask::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun categoryDao(): CategoryDao
+    abstract fun torrentTaskDao(): TorrentTaskDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -28,6 +29,19 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE tasks ADD COLUMN categoryId TEXT NOT NULL DEFAULT 'other'")
                 db.execSQL("ALTER TABLE tasks ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE tasks ADD COLUMN expectedSha256 TEXT")
+            }
+        }
+
+        /** P4 schema: torrent extras table + task kind. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS torrent_tasks (" +
+                        "id TEXT NOT NULL PRIMARY KEY, magnet TEXT, torrentPath TEXT, " +
+                        "selectedPaths TEXT NOT NULL DEFAULT '', sequential INTEGER NOT NULL DEFAULT 0, " +
+                        "name TEXT NOT NULL DEFAULT '', sizeBytes INTEGER NOT NULL DEFAULT -1)",
+                )
+                db.execSQL("ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'http'")
             }
         }
     }
