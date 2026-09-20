@@ -208,4 +208,30 @@ class TaskRepositoryTest {
         val second = r.enqueue("https://x/f", allowDuplicate = true)
         assertThat(second).isNotEqualTo(first)
     }
+
+    @Test fun rename_completedMovesFile(): Unit = runBlocking {
+        val dao = FakeDao()
+        val r = repo(FakeDownloader(ResourceInfo("https://x/f", "f", 1, null, false)), dao)
+        val id = r.enqueue("https://x/old.bin")
+        dao.updateStatus(id, "completed")
+        val rec = dao.get(id)!!
+        File(rec.destPath, rec.fileName).apply { parentFile!!.mkdirs(); writeText("abc") }
+        assertThat(r.rename(id, "new.bin")).isTrue()
+        assertThat(File(rec.destPath, "new.bin").exists()).isTrue()
+        assertThat(dao.get(id)!!.fileName).isEqualTo("new.bin")
+        assertThat(r.rename(id, "../evil")).isFalse()
+        assertThat(r.rename(id, "  ")).isFalse()
+    }
+
+    @Test fun sha256_matchesKnownDigest(): Unit = runBlocking {
+        val dao = FakeDao()
+        val r = repo(FakeDownloader(ResourceInfo("https://x/f", "f", 1, null, false)), dao)
+        val id = r.enqueue("https://x/f.bin")
+        dao.updateStatus(id, "completed")
+        val rec = dao.get(id)!!
+        File(rec.destPath, rec.fileName).apply { parentFile!!.mkdirs(); writeText("abc") }
+        assertThat(r.sha256Of(id))
+            .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        assertThat(r.sha256Of("missing")).isNull()
+    }
 }

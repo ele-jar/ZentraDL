@@ -9,6 +9,7 @@ import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.DownloadSpec
 import com.elejar.ZentraDL.engine.model.Downloader
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -16,6 +17,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * App-level task coordinator (P1 skeleton).
@@ -135,6 +138,44 @@ class TaskRepository @Inject constructor(
         if (id == "other") return
         dao.clearCategory(id)
         categoryDao?.delete(id)
+    }
+
+    /** Rename a task (and its file when already downloaded). False = invalid/blocked. */
+    suspend fun rename(id: String, newName: String): Boolean {
+        val clean = newName.trim()
+        if (clean.isBlank() || clean.contains('/') || clean.contains('\\') || clean == "." || clean == "..") {
+            return false
+        }
+        val rec = dao.get(id) ?: return false
+        if (rec.fileName == clean) return true
+        if (rec.status == "completed" && !jobs.containsKey(id)) {
+            val src = File(rec.destPath, rec.fileName)
+            val dest = File(rec.destPath, clean)
+            if (src.exists() && (dest.exists() || !src.renameTo(dest))) return false
+        }
+        dao.updateMeta(id, clean, rec.totalBytes, rec.destPath)
+        return true
+    }
+
+    /** SHA-256 of the downloaded file (null when missing). IO-bound; call sparingly. */
+    suspend fun sha256Of(id: String): String? = withContext(Dispatchers.IO) {
+        val rec = dao.get(id) ?: return@withContext null
+        val f = File(rec.destPath, rec.fileName)
+        if (!f.exists()) return@withContext null
+        val md = MessageDigest.getInstance("SHA-256")
+        f.inputStream().use { ins ->
+            val buf = ByteArray(8192)
+            while (true) {
+                val n = ins.read(buf)
+                if (n < 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    suspend fun setExpectedSha(id: String, hex: String?) {
+        dao.updateExpectedSha(id, hex?.trim()?.lowercase()?.takeIf { it.isNotBlank() })
     }
 
     /** Starts (or joins) the single execution of [id]; waits for a queue slot first. */

@@ -29,4 +29,22 @@ object FileActions {
         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         cm.setPrimaryClip(android.content.ClipData.newPlainText("link", url))
     }
+
+    /** Share a downloaded file with other apps (FileProvider, correct MIME). */
+    fun shareFile(ctx: Context, file: File): Boolean {
+        if (!file.exists()) return false
+        val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".files", file)
+        val mime = MimeTypeMap.getSingleton()
+            .getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"
+        val intent = Intent(Intent.ACTION_SEND)
+            .setType(mime)
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        return try {
+            ctx.startActivity(Intent.createChooser(intent, file.name))
+            true
+        } catch (e: ActivityNotFoundException) {
+            false
+        }
+    }
 }

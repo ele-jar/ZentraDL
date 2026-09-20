@@ -78,4 +78,16 @@
     <string name="download_anyway">Download anyway</string>
     <string name="no_link_clipboard">No link in clipboard</string>
     <string name="export_list">Export links</string>
+    <string name="selected_n">%1$d selected</string>
+    <string name="clear_selection">Clear selection</string>
+    <string name="rename">Rename</string>
+    <string name="new_name">New name</string>
+    <string name="move_to">Move to…</string>
+    <string name="share_file">Share file</string>
+    <string name="no_file">File not found</string>
+    <string name="save">Save</string>
+    <string name="checksum_title">Checksum</string>
+    <string name="expected_sha">Expected SHA-256 (optional)</string>
+    <string name="checksum_match">Checksum matches — file looks good.</string>
+    <string name="checksum_mismatch">Checksum does NOT match — file may be corrupt.</string>
 </resources>

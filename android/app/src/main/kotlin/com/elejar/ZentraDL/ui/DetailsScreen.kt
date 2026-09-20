@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -69,10 +70,15 @@ fun DetailsScreen(
 ) {
     val rec by vm.record.collectAsState()
     val progress by vm.progress.collectAsState()
+    val categories by vm.categories.collectAsState()
+    val hash by vm.hash.collectAsState()
     val ctx = LocalContext.current
     val snacks = remember { SnackbarHostState() }
     var menu by remember { mutableStateOf(false) }
     var confirmDeleteFile by remember { mutableStateOf(false) }
+    var rename by remember { mutableStateOf(false) }
+    var move by remember { mutableStateOf(false) }
+    val noFileText = stringResource(R.string.no_file)
 
     LaunchedEffect(vm) {
         vm.events.collect { snacks.showSnackbar(it) }
@@ -101,6 +107,25 @@ fun DetailsScreen(
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.more_actions_simple))
                     }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.rename)) },
+                            onClick = { menu = false; rename = true },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.move_to)) },
+                            onClick = { menu = false; move = true },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.share_file)) },
+                            onClick = {
+                                menu = false
+                                val r = rec
+                                val f = r?.let { java.io.File(it.destPath, it.fileName) }
+                                if (r == null || f == null || !FileActions.shareFile(ctx, f)) {
+                                    vm.message(noFileText)
+                                }
+                            },
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.copy_link)) },
                             onClick = {
@@ -173,6 +198,43 @@ fun DetailsScreen(
 
             FactsGrid(r)
 
+            // Checksum (H9-lite): computed hash + optional expected value to compare.
+            if (r.status == "completed") {
+                LaunchedEffect(r.id) { vm.loadHash() }
+                var expected by remember(r.id, r.expectedSha256) { mutableStateOf(r.expectedSha256.orEmpty()) }
+                Text(stringResource(R.string.checksum_title), style = MaterialTheme.typography.titleSmall)
+                hash?.let { h ->
+                    Text(
+                        "SHA-256 $h",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                OutlinedTextField(
+                    value = expected,
+                    onValueChange = { expected = it },
+                    label = { Text(stringResource(R.string.expected_sha)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { vm.saveExpected(expected) }) {
+                        Text(stringResource(R.string.save))
+                    }
+                }
+                val saved = r.expectedSha256
+                if (hash != null && !saved.isNullOrBlank()) {
+                    val ok = saved.equals(hash, ignoreCase = true)
+                    Text(
+                        stringResource(if (ok) R.string.checksum_match else R.string.checksum_mismatch),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
             // Actions.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (r.status) {
@@ -207,6 +269,38 @@ fun DetailsScreen(
             dismissButton = {
                 TextButton(onClick = { confirmDeleteFile = false }) { Text(stringResource(R.string.cancel)) }
             },
+        )
+    }
+    if (rename) {
+        var name by remember(rec?.id) { mutableStateOf(rec?.fileName.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { rename = false },
+            title = { Text(stringResource(R.string.rename)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.new_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.rename(name); rename = false }) {
+                    Text(stringResource(R.string.rename))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { rename = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    if (move) {
+        CategoryPickerDialog(
+            categories = categories,
+            currentId = rec?.categoryId,
+            onDismiss = { move = false },
+            onPick = { vm.moveToCategory(it) },
         )
     }
 }

@@ -2,7 +2,9 @@ package com.elejar.ZentraDL.designsystem.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -72,27 +74,41 @@ data class CardData(
  * meta, animated 6dp progress, trailing action + status. Compact (64dp):
  * tile, 1-line title, progress, action.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun DownloadCard(
-    data: CardData,
+fun DownloadCard(    data: CardData,
     density: CardDensity,
     onAction: () -> Unit,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    selected: Boolean = false,
 ) {
     val animated by animateFloatAsState(
         targetValue = (data.progress ?: 0f).coerceIn(0f, 1f),
         animationSpec = tween(300),
         label = "cardProgress",
     )
+    // Long-press needs combinedClickable, which Card(onClick) lacks: when set,
+    // the Card itself is inert and the combined handler below owns both taps.
     Card(
-        onClick = onClick ?: {},
-        enabled = onClick != null,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        onClick = if (onLongClick != null) ({}) else (onClick ?: {}),
+        enabled = onClick != null || onLongClick != null,
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
         shape = if (density == CardDensity.Compact) MaterialTheme.shapes.medium else MaterialTheme.shapes.large,
         modifier = modifier
             .fillMaxWidth()
-            .semantics { stateDescription = data.semanticsSummary },
+            .semantics { stateDescription = data.semanticsSummary }
+            .then(
+                if (onLongClick != null) {
+                    Modifier.combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongClick)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

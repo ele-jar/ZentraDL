@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +23,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapVert
@@ -43,9 +49,12 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -92,12 +101,23 @@ fun DownloadsScreen(
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(DownloadsUi.StatusFilter.All) }
     val noLinkText = stringResource(R.string.no_link_clipboard)
+    var selection by remember { mutableStateOf(setOf<String>()) }
+    var renameTarget by remember { mutableStateOf<TaskRecord?>(null) }
+    var moveRequest by remember { mutableStateOf<Set<String>?>(null) }
 
     LaunchedEffect(vm) {
         vm.events.collect { e ->
             when (e) {
                 is DownloadsViewModel.Event.Message -> snacks.showSnackbar(e.text)
                 is DownloadsViewModel.Event.Duplicate -> duplicate = e
+                is DownloadsViewModel.Event.DeletedBatch -> {
+                    val r = snacks.showSnackbar(
+                        message = "Deleted ${e.records.size} downloads",
+                        actionLabel = "Undo",
+                        duration = SnackbarDuration.Long,
+                    )
+                    if (r == SnackbarResult.ActionPerformed) vm.undoDeleteBatch(e.records)
+                }
                 is DownloadsViewModel.Event.Deleted -> {
                     val r = snacks.showSnackbar(
                         message = "Deleted ${e.record.fileName}",
@@ -122,6 +142,7 @@ fun DownloadsScreen(
 
     Scaffold(
         topBar = {
+            if (selection.isEmpty()) {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
@@ -145,6 +166,43 @@ fun DownloadsScreen(
                     }
                 },
             )
+            } else {
+                // Multi-select toolbar: count + Pause/Delete/Move.
+                TopAppBar(
+                    title = { Text(stringResource(R.string.selected_n, selection.size)) },
+                    navigationIcon = {
+                        IconButton(onClick = { selection = emptySet() }) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.clear_selection))
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { vm.pauseIds(selection); selection = emptySet() }) {
+                            Icon(Icons.Filled.Pause, contentDescription = stringResource(R.string.pause))
+                        }
+                        Box {
+                            var catMenu by remember { mutableStateOf(false) }
+                            IconButton(onClick = { catMenu = true }) {
+                                Icon(Icons.Filled.Folder, contentDescription = stringResource(R.string.move_to))
+                            }
+                            DropdownMenu(expanded = catMenu, onDismissRequest = { catMenu = false }) {
+                                categories.forEach { c ->
+                                    DropdownMenuItem(
+                                        text = { Text(c.name) },
+                                        onClick = {
+                                            vm.moveIdsToCategory(selection, c.id)
+                                            selection = emptySet()
+                                            catMenu = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        IconButton(onClick = { vm.deleteIds(selection, deleteFile = false); selection = emptySet() }) {
+                            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
+                        }
+                    },
+                )
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -223,7 +281,58 @@ fun DownloadsScreen(
                             )
                             is DownloadsUi.ListItem.Row -> {
                                 val row = item.row
-                                var menu by remember(row.record.id) { mutableStateOf(false) }
+                                val id = row.record.id
+                                var menu by remember(id) { mutableStateOf(false) }
+                                // Swipe right = pause/resume/open (snaps back); left = delete + Undo.
+                                val dismiss = rememberSwipeToDismissBoxState(
+                                    confirmValueChange = { v ->
+                                        when (v) {
+                                            SwipeToDismissBoxValue.EndToStart -> {
+                                                vm.delete(id, deleteFile = false)
+                                                true
+                                            }
+                                            SwipeToDismissBoxValue.StartToEnd -> {
+                                                when (row.status) {
+                                                    TaskStatus.Downloading, TaskStatus.Queued -> vm.pause(id)
+                                                    TaskStatus.Paused, TaskStatus.Failed -> vm.retry(id, ::startService)
+                                                    TaskStatus.Completed ->
+                                                        openOrComplain(ctx, row.record) { vm.message(it) }
+                                                    else -> Unit
+                                                }
+                                                false
+                                            }
+                                            else -> false
+                                        }
+                                    },
+                                )
+                                SwipeToDismissBox(
+                                    state = dismiss,
+                                    backgroundContent = {
+                                        val dir = dismiss.dismissDirection
+                                        if (dir != null) {
+                                            val left = dir == SwipeToDismissBoxValue.StartToEnd
+                                            Box(
+                                                contentAlignment = if (left) Alignment.CenterStart else Alignment.CenterEnd,
+                                                modifier = Modifier.fillMaxSize().background(
+                                                    if (left) MaterialTheme.colorScheme.primaryContainer
+                                                    else MaterialTheme.colorScheme.errorContainer,
+                                                ).padding(horizontal = 24.dp),
+                                            ) {
+                                                Icon(
+                                                    if (left) {
+                                                        when (row.status) {
+                                                            TaskStatus.Downloading, TaskStatus.Queued -> Icons.Filled.Pause
+                                                            else -> Icons.Filled.PlayArrow
+                                                        }
+                                                    } else {
+                                                        Icons.Filled.Delete
+                                                    },
+                                                    contentDescription = null,
+                                                )
+                                            }
+                                        }
+                                    },
+                                ) {
                                 Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                                     DownloadCard(
                                         data = row.toCardData(),
@@ -237,7 +346,15 @@ fun DownloadsScreen(
                                             }
                                         },
                                         modifier = Modifier.fillMaxWidth(),
-                                        onClick = { onDetails(row.record.id) },
+                                        onClick = {
+                                            if (selection.isNotEmpty()) {
+                                                selection = if (id in selection) selection - id else selection + id
+                                            } else {
+                                                onDetails(id)
+                                            }
+                                        },
+                                        onLongClick = { selection = selection + id },
+                                        selected = id in selection,
                                     )
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                         Box {
@@ -248,6 +365,14 @@ fun DownloadsScreen(
                                                 )
                                             }
                                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(R.string.rename)) },
+                                                onClick = { menu = false; renameTarget = row.record },
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(R.string.move_to)) },
+                                                onClick = { menu = false; moveRequest = setOf(id) },
+                                            )
                                             DropdownMenuItem(
                                                 text = { Text(stringResource(R.string.copy_link)) },
                                                 onClick = { FileActions.copyLink(ctx, row.record.url); menu = false },
@@ -269,6 +394,7 @@ fun DownloadsScreen(
                                         }
                                         }
                                     }
+                                }
                                 }
                             }
                         }
@@ -301,6 +427,38 @@ fun DownloadsScreen(
                     },
                 ) { Text(stringResource(R.string.download_anyway)) }
             },
+        )
+    }
+    renameTarget?.let { rec ->
+        var name by remember(rec.id) { mutableStateOf(rec.fileName) }
+        AlertDialog(
+            onDismissRequest = { renameTarget = null },
+            title = { Text(stringResource(R.string.rename)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.new_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.rename(rec.id, name); renameTarget = null }) {
+                    Text(stringResource(R.string.rename))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameTarget = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    moveRequest?.let { ids ->
+        CategoryPickerDialog(
+            categories = categories,
+            currentId = null,
+            onDismiss = { moveRequest = null },
+            onPick = { vm.moveIdsToCategory(ids, it) },
         )
     }
     confirmDeleteFile?.let { rec ->

@@ -196,6 +196,32 @@ class DownloadsViewModel @Inject constructor(
         viewModelScope.launch { repo.pauseAll() }
     }
 
+    fun pauseIds(ids: Set<String>) {
+        viewModelScope.launch { ids.forEach { repo.pause(it) } }
+    }
+
+    fun deleteIds(ids: Set<String>, deleteFile: Boolean) {
+        viewModelScope.launch {
+            val recs = ids.mapNotNull { repo.get(it) }
+            recs.forEach { repo.delete(it.id, deleteFile) }
+            if (!deleteFile && recs.isNotEmpty()) _events.send(Event.DeletedBatch(recs))
+        }
+    }
+
+    fun undoDeleteBatch(recs: List<TaskRecord>) {
+        viewModelScope.launch { recs.forEach { repo.restore(it) } }
+    }
+
+    fun moveIdsToCategory(ids: Set<String>, categoryId: String) {
+        viewModelScope.launch { ids.forEach { repo.setCategory(it, categoryId) } }
+    }
+
+    fun rename(id: String, name: String) {
+        viewModelScope.launch {
+            if (!repo.rename(id, name)) _events.send(Event.Message("Invalid name"))
+        }
+    }
+
     fun message(text: String) {
         viewModelScope.launch { _events.send(Event.Message(text)) }
     }
@@ -237,6 +263,7 @@ class DownloadsViewModel @Inject constructor(
     sealed interface Event {
         data class Message(val text: String) : Event
         data class Deleted(val record: TaskRecord) : Event
+        data class DeletedBatch(val records: List<TaskRecord>) : Event
         data class Duplicate(val url: String, val name: String?, val categoryId: String?, val recordId: String) : Event
     }
 }
