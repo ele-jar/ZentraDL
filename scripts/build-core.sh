@@ -25,13 +25,17 @@ go install "golang.org/x/mobile/cmd/gomobile@$MOBILE_VERSION"
   go get -tool "golang.org/x/mobile/cmd/gobind@$MOBILE_VERSION"
 )
 gomobile init
-# NDK r28+ required for 16 KB page-size alignment (Play-enforced for Android 15+ targets).
+echo "gomobile on PATH: $(command -v gomobile)"
 (
   cd "$ROOT/core/upstream"
   mkdir -p "$OUT"
+  set -x
   gomobile bind -tags nosqlite -ldflags="-w -s -checklinkname=0" \
     -o "$OUT/libgopeed.aar" -target=android -androidapi 21 -javapkg="com.gopeed" \
     github.com/GopeedLab/gopeed/bind/mobile
+  set +x
 )
+echo "bind exit: $?"
+find "$ROOT" -maxdepth 4 -name "*.aar" 2>/dev/null
 test -f "$OUT/libgopeed.aar" || { echo "FATAL: AAR not produced"; ls -la "$OUT"; exit 1; }
 echo "AAR -> $OUT/libgopeed.aar"
