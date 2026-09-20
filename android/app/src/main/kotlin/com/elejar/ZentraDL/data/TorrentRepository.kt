@@ -133,6 +133,8 @@ class TorrentRepository(
             tasks.updateError(id, "Missing metadata")
             return
         }
+        // Resumes start from "paused" — snapshot it so only a *new* pause aborts the build.
+        val wasPaused = rec.status == "paused"
         stopSession(id)
         // The stopped session unregisters async (TorrentStopped event); a new
         // client registered too soon dies with IllegalStateException.
@@ -150,12 +152,12 @@ class TorrentRepository(
         val session = engine.download(
             TorrentDownloadSpec(row.magnet, bytes, File(rec.destPath), selected, row.sequential, meta.pieceLength),
         )
-        // Cancelled while building: park, don't start.
-        if (tasks.get(id)?.status == "paused") {
-            session.stop()
+        sessions[id] = session
+        // Cancelled while building (and not a resume): park, don't start.
+        if (!wasPaused && tasks.get(id)?.status == "paused") {
+            sessions.remove(id)?.stop()
             return
         }
-        sessions[id] = session
         try {
             session.stats.onEach { s ->
                 val total = rec.totalBytes.takeIf { it > 0 } ?: meta.sizeBytes
