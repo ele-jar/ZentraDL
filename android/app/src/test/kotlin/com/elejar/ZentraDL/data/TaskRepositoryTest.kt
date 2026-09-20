@@ -66,6 +66,10 @@ private class FakeDao : TaskDao {
         records[id] = records[id]!!.copy(vaulted = vaulted)
         emit()
     }
+    override suspend fun updateUrl(id: String, url: String, extra: String) {
+        val r = records[id]!!
+        records[id] = r.copy(url = url, extra = extra)
+    }
     override suspend fun updateExpectedSha(id: String, sha256: String?) {
         records[id] = records[id]!!.copy(expectedSha256 = sha256)
         emit()
