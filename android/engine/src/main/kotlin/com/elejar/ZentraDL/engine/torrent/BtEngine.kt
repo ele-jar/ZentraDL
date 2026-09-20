@@ -149,8 +149,8 @@ class BtEngine(
                 throw MetadataTimeoutException(magnet)
             } finally {
                 runCatching { client.stop() }
+                tmp.deleteRecursively()
             }
-            tmp.deleteRecursively()
         }
 
     /** Start (or resume — existing data is re-verified automatically) a download. */
