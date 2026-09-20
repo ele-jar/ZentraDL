@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.elejar.ZentraDL.data.GateMonitor
 import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
+import com.elejar.ZentraDL.data.TorrentRepository
 import com.elejar.ZentraDL.data.local.AppDatabase
 import com.elejar.ZentraDL.data.local.CategoryDao
 import com.elejar.ZentraDL.data.local.TaskDao
@@ -48,6 +49,17 @@ object AppModule {
     @Provides
     @Singleton
     fun provideBtEngine(): BtEngine = BtEngine()
+
+    @Provides
+    @Singleton
+    fun provideTorrentRepository(
+        dao: TaskDao,
+        torrentDao: TorrentTaskDao,
+        categoryDao: CategoryDao,
+        engine: BtEngine,
+        appScope: CoroutineScope,
+        @ApplicationContext ctx: Context,
+    ): TorrentRepository = TorrentRepository(dao, torrentDao, categoryDao, engine, appScope, ctx.filesDir)
 
     @Provides
     @Singleton

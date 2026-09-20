@@ -1,6 +1,5 @@
 package com.elejar.ZentraDL.data
 
-import android.content.Context
 import com.elejar.ZentraDL.data.local.CategoryDao
 import com.elejar.ZentraDL.data.local.TaskDao
 import com.elejar.ZentraDL.data.local.TaskRecord
@@ -17,11 +16,8 @@ import com.elejar.ZentraDL.engine.torrent.TorrentPeer
 import com.elejar.ZentraDL.engine.torrent.TorrentPieceMap
 import com.elejar.ZentraDL.engine.torrent.TorrentRunState
 import com.elejar.ZentraDL.engine.torrent.TorrentStats
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,15 +32,16 @@ import kotlinx.coroutines.launch
  * App-level torrent coordinator (P4). Metadata in Room ([TorrentTask]),
  * transfers in [BtSession] (one live client each). Finished sessions keep
  * seeding until paused; pause/resume rebuilds (re-verify is automatic).
+ *
+ * Takes [filesDir] (not Context) so unit tests run on plain JVM, no Robolectric.
  */
-@Singleton
-class TorrentRepository @Inject constructor(
+class TorrentRepository(
     private val tasks: TaskDao,
     private val torrents: TorrentTaskDao,
     private val categories: CategoryDao,
     private val engine: BtEngine,
     private val appScope: CoroutineScope,
-    @ApplicationContext private val ctx: Context,
+    private val filesDir: File,
 ) {
     private val sessions = ConcurrentHashMap<String, BtSession>()
     private val metas = ConcurrentHashMap<String, TorrentMeta>()
@@ -61,7 +58,7 @@ class TorrentRepository @Inject constructor(
         }
     }
 
-    private fun torrentsDir(): File = File(ctx.filesDir, "torrents").apply { mkdirs() }
+    private fun torrentsDir(): File = File(filesDir, "torrents").apply { mkdirs() }
     private fun metaFile(id: String): File = File(torrentsDir(), "$id.torrent")
 
     fun observeTorrent(id: String): Flow<TorrentTask?> = torrents.observe(id)
@@ -99,7 +96,7 @@ class TorrentRepository @Inject constructor(
     private suspend fun insertTorrent(meta: TorrentMeta, magnet: String?, categoryId: String?): String {
         val cat = categoryId ?: Categorizer.categorize(meta.name, null, null).categoryId
         val folder = categories.get(cat)?.folder ?: "Other"
-        val destDir = File(ctx.filesDir.resolve("downloads"), folder)
+        val destDir = File(filesDir.resolve("downloads"), folder)
         tasks.insert(
             TaskRecord(
                 id = meta.idHex, url = magnet ?: "torrent:${meta.idHex}", fileName = meta.name,

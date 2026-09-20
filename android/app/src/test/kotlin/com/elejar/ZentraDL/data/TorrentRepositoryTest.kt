@@ -29,9 +29,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 
 private class FakeTaskDao : TaskDao {
     val records = mutableMapOf<String, TaskRecord>()
@@ -90,14 +87,13 @@ private class FakeCategoryDao : CategoryDao {
     override suspend fun delete(id: String) = Unit
 }
 
-/** TorrentRepository over a loopback seeder (Robolectric for filesDir). */
-@RunWith(RobolectricTestRunner::class)
+/** TorrentRepository over a loopback seeder (plain JVM — filesDir is a temp dir). */
 class TorrentRepositoryTest {
 
     private fun freePort(): Int = ServerSocket(0).use { it.localPort }
 
     @Test fun addMagnet_downloads_pauses_resumes(): Unit = runBlocking {
-        val ctx = RuntimeEnvironment.getApplication()
+        val filesDir = Files.createTempDirectory("trepo").toFile()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
             // Seed data + torrent (maker, 16 KiB pieces).
@@ -127,7 +123,7 @@ class TorrentRepositoryTest {
                 BtOptions(acceptorPort = freePort(), bindHost = "127.0.0.1", enableDht = false),
             )
             val dao = FakeTaskDao()
-            val trepo = TorrentRepository(dao, FakeTorrentDao(), FakeCategoryDao(), engine, scope, ctx)
+            val trepo = TorrentRepository(dao, FakeTorrentDao(), FakeCategoryDao(), engine, scope, filesDir)
             val idHex = engine.parseTorrentBytes(bytes).idHex
             val magnet = "magnet:?xt=urn:btih:$idHex&x.pe=127.0.0.1:$seedPort"
             val id = trepo.addMagnet(magnet, null)
