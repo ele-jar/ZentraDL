@@ -33,8 +33,8 @@ android {
     packaging { jniLibs { useLegacyPackaging = false } } // 16 KB page alignment via NDK r28+
 }
 dependencies {
-    implementation(project(":engine"))
-    implementation(project(":designsystem"))
+    implementation(project(":android:engine"))
+    implementation(project(":android:designsystem"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.activity.compose)

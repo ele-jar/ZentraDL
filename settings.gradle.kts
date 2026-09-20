@@ -11,6 +11,3 @@ dependencyResolutionManagement {
 }
 rootProject.name = "ZentraDL"
 include(":android:app", ":android:engine", ":android:designsystem")
-project(":android:app").name = "app"
-project(":android:engine").name = "engine"
-project(":android:designsystem").name = "designsystem"
