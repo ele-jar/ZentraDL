@@ -29,8 +29,8 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     val maxRunning: Flow<Int> = ctx.prefs.data.map { it[maxRunningKey] ?: 3 }
     val density: Flow<String> = ctx.prefs.data.map { it[densityKey] ?: "comfortable" }
     val sort: Flow<String> = ctx.prefs.data.map { it[sortKey] ?: "date" }
-    val themeMode: Flow<String> = ctx.prefs.data.map { it[themeModeKey] ?: "system" }
-    val accent: Flow<String> = ctx.prefs.data.map { it[accentKey] ?: "blue" }
+    val themeMode: Flow<String> = ctx.prefs.data.map { it[themeModeKey] ?: "System" }
+    val accent: Flow<String> = ctx.prefs.data.map { it[accentKey] ?: "Blue" }
     val dynamicColor: Flow<Boolean> = ctx.prefs.data.map { it[dynamicColorKey] ?: true }
 
     suspend fun setConnections(n: Int) {

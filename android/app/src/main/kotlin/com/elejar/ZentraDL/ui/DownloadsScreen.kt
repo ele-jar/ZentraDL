@@ -68,7 +68,10 @@ import com.elejar.ZentraDL.service.DownloadService
 /** Downloads home (P2b: list + queue; details land in P2c). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DownloadsScreen(vm: DownloadsViewModel = hiltViewModel()) {
+fun DownloadsScreen(
+    onDetails: (String) -> Unit,
+    vm: DownloadsViewModel = hiltViewModel(),
+) {
     val items by vm.items.collectAsState()
     val header by vm.header.collectAsState()
     val density by vm.density.collectAsState()
@@ -183,8 +186,7 @@ fun DownloadsScreen(vm: DownloadsViewModel = hiltViewModel()) {
                                     DownloadCard(
                                         data = row.toCardData(),
                                         density = if (density == "compact") CardDensity.Compact else CardDensity.Comfortable,
-                                        onAction = {
-                                            when (row.status) {
+                                        onAction = {when (row.status) {
                                                 TaskStatus.Downloading, TaskStatus.Queued -> vm.pause(row.record.id)
                                                 TaskStatus.Paused, TaskStatus.Failed -> vm.retry(row.record.id, ::startService)
                                                 TaskStatus.Completed ->
@@ -193,6 +195,7 @@ fun DownloadsScreen(vm: DownloadsViewModel = hiltViewModel()) {
                                             }
                                         },
                                         modifier = Modifier.fillMaxWidth(),
+                                        onClick = { onDetails(row.record.id) },
                                     )
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                         Box {

@@ -42,6 +42,8 @@ class TaskRepository @Inject constructor(
 ) {
     val records: Flow<List<TaskRecord>> = dao.observeAll()
 
+    fun observe(id: String): Flow<TaskRecord?> = dao.observe(id)
+
     private val _progress = MutableStateFlow(mapOf<String, DownloadProgress>())
     val progress: StateFlow<Map<String, DownloadProgress>> = _progress.asStateFlow()
 

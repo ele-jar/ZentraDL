@@ -26,4 +26,17 @@
     <string name="name_label">Name</string>
     <string name="check">Check</string>
     <string name="queue_action">Queue</string>
+    <string name="back">Back</string>
+    <string name="more_actions_simple">More actions</string>
+    <string name="pause">Pause</string>
+    <string name="open_file">Open</string>
+    <string name="loading">Loading…</string>
+    <string name="unknown_size">Unknown size</string>
+    <string name="label_size">Size</string>
+    <string name="label_status">Status</string>
+    <string name="label_added">Added</string>
+    <string name="label_save_path">Save path</string>
+    <string name="label_link">Link</string>
+    <string name="segments_title">Segments</string>
+    <string name="segments_row">#%1$d %2$s–%3$s · %4$d%% · %5$d retries</string>
 </resources>

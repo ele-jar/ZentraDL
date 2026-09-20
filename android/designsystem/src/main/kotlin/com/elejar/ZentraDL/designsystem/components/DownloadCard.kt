@@ -78,6 +78,7 @@ fun DownloadCard(
     density: CardDensity,
     onAction: () -> Unit,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     val animated by animateFloatAsState(
         targetValue = (data.progress ?: 0f).coerceIn(0f, 1f),
@@ -85,6 +86,8 @@ fun DownloadCard(
         label = "cardProgress",
     )
     Card(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         shape = if (density == CardDensity.Compact) MaterialTheme.shapes.medium else MaterialTheme.shapes.large,
         modifier = modifier
