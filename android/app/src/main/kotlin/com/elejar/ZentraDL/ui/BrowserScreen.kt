@@ -155,15 +155,16 @@ fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
     ) { pads ->
         Column(Modifier.fillMaxSize().padding(pads)) {
             val url = tab?.url.orEmpty()
-            if (url.isBlank()) {
+            val current = tab
+            if (url.isBlank() || current == null) {
                 StartPage(
                     bookmarks = bookmarks,
                     onOpen = { vm.go(it) },
                 )
             } else {
-                var webRef by remember(tab.id) { mutableStateOf<WebView?>(null) }
-                var canGoBack by remember(tab.id) { mutableStateOf(false) }
-                var canGoForward by remember(tab.id) { mutableStateOf(false) }
+                var webRef by remember(current.id) { mutableStateOf<WebView?>(null) }
+                var canGoBack by remember(current.id) { mutableStateOf(false) }
+                var canGoForward by remember(current.id) { mutableStateOf(false) }
                 BackHandler(enabled = canGoBack) {
                     webRef?.goBack()
                 }
@@ -229,8 +230,8 @@ fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
                                     vm.onPage(v.url.orEmpty(), t.orEmpty())
                                 }
                             }
-                            setDownloadListener { u, _, _, _, _, _ -> vm.onDownload(u) }
-                            loadUrl(tab.url)
+                            setDownloadListener { u, _, _, _, _ -> vm.onDownload(u) }
+                            loadUrl(current.url)
                         }
                     },
                     update = { wv ->
@@ -240,7 +241,7 @@ fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
                     modifier = Modifier.fillMaxSize(),
                     onRelease = { it.destroy() },
                 )
-                DisposableEffect(tab.id) {
+                DisposableEffect(current.id) {
                     onDispose { webRef?.destroy(); webRef = null }
                 }
             }
