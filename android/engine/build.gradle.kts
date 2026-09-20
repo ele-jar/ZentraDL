@@ -9,6 +9,15 @@ android {
     defaultConfig { minSdk = libs.versions.minSdk.get().toInt() }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+    testOptions {
+        unitTests.all {
+            testLogging {
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                showCauses = true
+                showStackTraces = true
+            }
+        }
+    }
 }
 dependencies {
     implementation(libs.okhttp)
