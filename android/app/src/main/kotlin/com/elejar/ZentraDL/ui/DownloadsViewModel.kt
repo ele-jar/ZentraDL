@@ -189,12 +189,12 @@ class DownloadsViewModel @Inject constructor(
         viewModelScope.launch { trepo.cancelTorrent(id) }
     }
 
-    fun deleteTorrent(id: String, deleteFiles: Boolean) {
+    fun deleteTorrent(id: String, deleteFile: Boolean) {
         viewModelScope.launch {
             val rec = repo.get(id) ?: return@launch
             val row = trepo.torrentRow(id)
-            trepo.deleteTorrent(id, deleteFiles)
-            if (!deleteFiles && row != null) _events.send(Event.TorrentDeleted(rec, row))
+            trepo.deleteTorrent(id, deleteFile)
+            if (!deleteFile && row != null) _events.send(Event.TorrentDeleted(rec, row))
         }
     }
 

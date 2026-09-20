@@ -75,7 +75,6 @@ class TorrentAddViewModel @Inject constructor(
                 State.Error("Couldn't fetch it: ${e.message}")
             }
         }
-        }
     }
 
     fun fetchFileUrl(url: String) {

@@ -203,13 +203,13 @@ class TorrentRepository(
         sessions.keys.toList().forEach { sessions[it]?.stop() }
     }
 
-    suspend fun deleteTorrent(id: String, deleteFiles: Boolean) {
+    suspend fun deleteTorrent(id: String, deleteFile: Boolean) {
         sessions.remove(id)?.stop()
         val rec = tasks.get(id)
         torrents.delete(id)
         tasks.delete(id)
         metaFile(id).delete()
-        if (deleteFiles && rec != null) {
+        if (deleteFile && rec != null) {
             File(rec.destPath, rec.fileName).takeIf { it.exists() }?.deleteRecursively()
         }
     }
