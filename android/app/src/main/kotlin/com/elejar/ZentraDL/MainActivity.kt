@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
     /** Validated share/view URL (http/https/magnet only); null when absent/invalid. */
     private fun extractShareUrl(intent: Intent?): String? {
         if (intent == null) return null
-        val raw: String? = when (intent.action) {
+        val raw: String = when (intent.action) {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
             Intent.ACTION_VIEW -> intent.data?.toString()
             Intent.ACTION_PROCESS_TEXT -> intent.getStringExtra(Intent.EXTRA_PROCESS_TEXT)

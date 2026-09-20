@@ -188,12 +188,12 @@ fun AddSheet(
                     // Batch: no probing — one link per line, auto-categorized each.
                     val count = url.lines().count { looksLikeLink(it) }
                     Button(
-                        onClick = { vm.addBatch(url, cat) { onStartService(it); onDismiss() } },
+                        onClick = { vm.addBatch(url, cat, startFirst = true) { onStartService(it); onDismiss() } },
                         enabled = count > 0,
                         modifier = Modifier.weight(1f),
                     ) { Text(stringResource(R.string.download_n, count)) }
                     OutlinedButton(
-                        onClick = { vm.addBatch(url, cat) {}; onDismiss() },
+                        onClick = { vm.addBatch(url, cat, startFirst = false) {}; onDismiss() },
                         enabled = count > 0,
                         modifier = Modifier.weight(1f),
                     ) { Text(stringResource(R.string.queue_action)) }
