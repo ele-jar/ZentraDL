@@ -44,9 +44,27 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
     val appLock: StateFlow<Boolean> = settings.appLock
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val dhtEnabled: StateFlow<Boolean> = settings.dhtEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val maxPeers: StateFlow<Int> = settings.maxPeers
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 50)
+    val seedGoal: StateFlow<Int> = settings.seedGoal
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     fun setAppLock(v: Boolean) {
         viewModelScope.launch { settings.setAppLock(v) }
+    }
+
+    fun setDhtEnabled(v: Boolean) {
+        viewModelScope.launch { settings.setDhtEnabled(v) }
+    }
+
+    fun setMaxPeers(v: Int) {
+        viewModelScope.launch { settings.setMaxPeers(v) }
+    }
+
+    fun setSeedGoal(v: Int) {
+        viewModelScope.launch { settings.setSeedGoal(v) }
     }
 
     fun setWifiOnly(v: Boolean) {

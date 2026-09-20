@@ -117,6 +117,19 @@
     <string name="cell_hint">Tap the map to inspect a cell. Pinch to zoom.</string>
     <string name="peers_n">%1$d peers</string>
     <string name="peers_empty">No peers connected right now.</string>
+    <string name="recheck">Recheck</string>
+    <string name="move_storage">Move storage…</string>
+    <string name="export_torrent">Export .torrent</string>
+    <string name="copy_magnet">Copy magnet</string>
+    <string name="torrent_section">Torrents</string>
+    <string name="dht_title">DHT</string>
+    <string name="dht_desc">Find trackerless peers via the distributed hash table.</string>
+    <string name="max_peers_title">Max peers per torrent</string>
+    <string name="max_peers_desc">Fewer peers use less battery and data.</string>
+    <string name="seed_goal_title">Seed goal</string>
+    <string name="seed_goal_desc">Stop seeding at this upload ratio. 0 = seed forever.</string>
+    <string name="ratio_x">%1$.1fx</string>
+    <string name="applies_new_sessions">Applies to torrents started afterwards.</string>
     <string name="selected_n">%1$d selected</string>
     <string name="clear_selection">Clear selection</string>
     <string name="rename">Rename</string>

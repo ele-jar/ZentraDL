@@ -59,7 +59,7 @@ data class BtOptions(
  * No Android imports (JVM-testable).
  */
 class BtEngine(
-    private val opts: BtOptions = BtOptions(),
+    @Volatile var opts: BtOptions = BtOptions(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val metaService: IMetadataService = MetadataService()

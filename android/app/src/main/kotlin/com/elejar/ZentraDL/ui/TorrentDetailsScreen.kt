@@ -80,12 +80,15 @@ fun TorrentDetailsScreen(
     val live by vm.live.collectAsState()
     val meta by vm.meta.collectAsState()
     val trow by vm.trow.collectAsState()
+    val categories by vm.categories.collectAsState()
     val ctx = LocalContext.current
     val snacks = remember { SnackbarHostState() }
     var menu by remember { mutableStateOf(false) }
     var confirmDeleteFile by remember { mutableStateOf(false) }
+    var move by remember { mutableStateOf(false) }
     var tab by remember { mutableIntStateOf(0) }
     val tabs = TorrentTab.entries
+    val noFileText = stringResource(R.string.no_file)
 
     LaunchedEffect(vm) {
         vm.events.collect { snacks.showSnackbar(it) }
@@ -114,6 +117,35 @@ fun TorrentDetailsScreen(
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.more_actions_simple))
                     }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.recheck)) },
+                            onClick = { menu = false; vm.recheck { DownloadService.startTorrent(ctx, it) } },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.move_storage)) },
+                            onClick = { menu = false; move = true },
+                        )
+                        if (trow?.magnet != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.copy_magnet)) },
+                                onClick = {
+                                    trow?.magnet?.let { FileActions.copyLink(ctx, it) }
+                                    menu = false
+                                },
+                            )
+                        }
+                        if (trow?.torrentPath != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.export_torrent)) },
+                                onClick = {
+                                    menu = false
+                                    val f = trow?.torrentPath?.let { java.io.File(it) }
+                                    if (f == null || !FileActions.shareFile(ctx, f)) {
+                                        vm.message(noFileText)
+                                    }
+                                },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.delete)) },
                             onClick = { menu = false; vm.delete(deleteFile = false) { onDeleted() } },
@@ -165,6 +197,14 @@ fun TorrentDetailsScreen(
             dismissButton = {
                 TextButton(onClick = { confirmDeleteFile = false }) { Text(stringResource(R.string.cancel)) }
             },
+        )
+    }
+    if (move) {
+        CategoryPickerDialog(
+            categories = categories,
+            currentId = rec?.categoryId,
+            onDismiss = { move = false },
+            onPick = { vm.moveStorage(it) },
         )
     }
 }

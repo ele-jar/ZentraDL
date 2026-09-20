@@ -20,6 +20,9 @@
 | `sched_end_min` | Network & schedule | 360 (06:00) | Window end; wraps midnight |
 | `speed_limit_kbps` | Network & schedule | 0 (unlimited) | Global cap, max 100 MB/s |
 | `app_lock` | Privacy & security | off | Device credential on start + resume |
+| `dht_enabled` | Torrents | on | DHT peer discovery (new sessions) |
+| `max_peers` | Torrents | 50 | Peers per torrent 5–200 (new sessions) |
+| `seed_goal` | Torrents | 0 (forever) | Stop seeding at ratio ×100 |
 | (categories) | Storage & organization | 7 built-ins | Room table; per-category folders; add/delete in Settings |
 
 > Reset-per-section, Torrent/Browser/Notifications/Smart groups, backup/restore: later phases.

@@ -33,6 +33,9 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     private val schedEndKey = intPreferencesKey("sched_end_min")
     private val speedLimitKbpsKey = intPreferencesKey("speed_limit_kbps")
     private val appLockKey = booleanPreferencesKey("app_lock")
+    private val dhtEnabledKey = booleanPreferencesKey("dht_enabled")
+    private val maxPeersKey = intPreferencesKey("max_peers_torrent")
+    private val seedGoalKey = intPreferencesKey("seed_goal_ratio")
 
     val connections: Flow<Int> = ctx.prefs.data.map { it[connectionsKey] ?: 8 }
     val maxRunning: Flow<Int> = ctx.prefs.data.map { it[maxRunningKey] ?: 3 }
@@ -49,6 +52,10 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     /** 0 = unlimited. */
     val speedLimitKbps: Flow<Int> = ctx.prefs.data.map { it[speedLimitKbpsKey] ?: 0 }
     val appLock: Flow<Boolean> = ctx.prefs.data.map { it[appLockKey] ?: false }
+    val dhtEnabled: Flow<Boolean> = ctx.prefs.data.map { it[dhtEnabledKey] ?: true }
+    val maxPeers: Flow<Int> = ctx.prefs.data.map { it[maxPeersKey] ?: 50 }
+    /** Seed goal ratio ×100 (0 = seed forever). */
+    val seedGoal: Flow<Int> = ctx.prefs.data.map { it[seedGoalKey] ?: 0 }
 
     /** Combined queue-gate policy (P3d). */
     val gatePolicy: Flow<GatePolicy> = combine(
@@ -112,4 +119,17 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     suspend fun setAppLock(v: Boolean) {
         ctx.prefs.edit { it[appLockKey] = v }
     }
+
+    suspend fun setDhtEnabled(v: Boolean) {
+        ctx.prefs.edit { it[dhtEnabledKey] = v }
+    }
+
+    suspend fun setMaxPeers(v: Int) {
+        ctx.prefs.edit { it[maxPeersKey] = v.coerceIn(5, 200) }
+    }
+
+    suspend fun setSeedGoal(v: Int) {
+        ctx.prefs.edit { it[seedGoalKey] = v.coerceIn(0, 1000) }
+    }
+}
 }

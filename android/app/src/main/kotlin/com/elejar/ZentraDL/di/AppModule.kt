@@ -24,6 +24,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 @Module
@@ -48,7 +49,16 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideBtEngine(): BtEngine = BtEngine()
+    fun provideBtEngine(settings: SettingsStore, appScope: CoroutineScope): BtEngine {
+        val engine = BtEngine()
+        // Live for NEW sessions (running ones keep their config).
+        appScope.launch {
+            combine(settings.dhtEnabled, settings.maxPeers) { dht, max ->
+                BtOptions(enableDht = dht, maxPeersPerTorrent = max)
+            }.collect { engine.opts = it }
+        }
+        return engine
+    }
 
     @Provides
     @Singleton
@@ -58,8 +68,11 @@ object AppModule {
         categoryDao: CategoryDao,
         engine: BtEngine,
         appScope: CoroutineScope,
+        settings: SettingsStore,
         @ApplicationContext ctx: Context,
-    ): TorrentRepository = TorrentRepository(dao, torrentDao, categoryDao, engine, appScope, ctx.filesDir)
+    ): TorrentRepository = TorrentRepository(
+        dao, torrentDao, categoryDao, engine, appScope, ctx.filesDir, settings.seedGoal,
+    )
 
     @Provides
     @Singleton

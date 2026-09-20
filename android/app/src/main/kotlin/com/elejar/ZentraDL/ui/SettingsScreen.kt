@@ -63,6 +63,9 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val schedEnd by vm.schedEndMin.collectAsState()
     val speedKbps by vm.speedLimitKbps.collectAsState()
     val appLock by vm.appLock.collectAsState()
+    val dhtEnabled by vm.dhtEnabled.collectAsState()
+    val maxPeers by vm.maxPeers.collectAsState()
+    val seedGoal by vm.seedGoal.collectAsState()
     val themeTitle = stringResource(R.string.theme)
     val accentTitle = stringResource(R.string.accent)
 
@@ -243,8 +246,47 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
             }
-            if (matches("privacy", "security", "lock", "vault")) {
-                item { SectionHeader(stringResource(R.string.privacy_section)) }
+            if (matches("torrent", "dht", "peers", "seed")) {
+                item { SectionHeader(stringResource(R.string.torrent_section)) }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.dht_title),
+                        description = stringResource(R.string.dht_desc),
+                        checked = dhtEnabled,
+                        onCheckedChange = { vm.setDhtEnabled(it) },
+                    )
+                }
+                item {
+                    SliderRow(
+                        title = stringResource(R.string.max_peers_title),
+                        description = stringResource(R.string.max_peers_desc),
+                        value = maxPeers.toFloat(),
+                        valueLabel = "$maxPeers",
+                        range = 5f..200f,
+                        onValueChange = { vm.setMaxPeers(it.toInt()) },
+                    )
+                }
+                item {
+                    SliderRow(
+                        title = stringResource(R.string.seed_goal_title),
+                        description = stringResource(R.string.seed_goal_desc),
+                        value = seedGoal / 100f,
+                        valueLabel = if (seedGoal == 0) stringResource(R.string.unlimited)
+                        else stringResource(R.string.ratio_x, seedGoal / 100f),
+                        range = 0f..5f,
+                        onValueChange = { vm.setSeedGoal((it * 100).toInt()) },
+                    )
+                }
+                item {
+                    Text(
+                        stringResource(R.string.applies_new_sessions),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+            }
+            if (matches("privacy", "security", "lock", "vault")) {                item { SectionHeader(stringResource(R.string.privacy_section)) }
                 item {
                     SwitchRow(
                         title = stringResource(R.string.app_lock),

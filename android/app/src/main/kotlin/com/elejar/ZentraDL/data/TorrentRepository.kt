@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -46,12 +47,16 @@ class TorrentRepository(
     private val engine: BtEngine,
     private val appScope: CoroutineScope,
     private val filesDir: File,
+    seedGoalRatio: Flow<Int> = flowOf(0),
 ) {
     private val sessions = ConcurrentHashMap<String, BtSession>()
     private val metas = ConcurrentHashMap<String, TorrentMeta>()
 
     private val _tprogress = MutableStateFlow(mapOf<String, DownloadProgress>())
     val tprogress: StateFlow<Map<String, DownloadProgress>> = _tprogress.asStateFlow()
+
+    /** Seed goal ratio (0 = seed forever); enforced in [runTorrent]. */
+    @Volatile private var seedGoal = 0f
 
     init {
         // Stuck "downloading" rows from a dead process park as paused.
@@ -60,6 +65,7 @@ class TorrentRepository(
                 .filter { it.kind == "torrent" && (it.status == "downloading" || it.status == "seeding") }
                 .forEach { tasks.updateStatus(it.id, "paused") }
         }
+        appScope.launch { seedGoalRatio.collect { seedGoal = it / 100f } }
     }
 
     private fun torrentsDir(): File = File(filesDir, "torrents").apply { mkdirs() }
@@ -190,6 +196,13 @@ class TorrentRepository(
                     },
                 )
                 if (s.state == TorrentRunState.FAILED) tasks.updateError(id, session.error.value)
+                // Seed goal: stop seeding at ratio (status parks as paused).
+                val goal = seedGoal
+                if (goal > 0 && s.downloadedBytes > 0 &&
+                    s.uploadedBytes >= (s.downloadedBytes * goal).toLong()
+                ) {
+                    session.stop()
+                }
             }.first { it.state == TorrentRunState.PAUSED || it.state == TorrentRunState.FAILED }
         } finally {
             sessions.remove(id)
@@ -206,8 +219,7 @@ class TorrentRepository(
         sessions.keys.toList().forEach { sessions[it]?.stop() }
     }
 
-    suspend fun deleteTorrent(id: String, deleteFile: Boolean) {
-        sessions.remove(id)?.stop()
+    suspend fun deleteTorrent(id: String, deleteFile: Boolean) {        sessions.remove(id)?.stop()
         val rec = tasks.get(id)
         torrents.delete(id)
         tasks.delete(id)
@@ -226,6 +238,25 @@ class TorrentRepository(
     suspend fun updateSelection(id: String, paths: Set<String>): Boolean {
         if (sessions.containsKey(id)) return false
         torrents.updateSelection(id, paths.joinToString(","))
+        return true
+    }
+
+    /**
+     * Move a torrent's data to another category folder (T4 move-storage).
+     * Stops a live session first; the user resumes afterwards.
+     */
+    suspend fun moveStorageToCategory(id: String, categoryId: String): Boolean {
+        val rec = tasks.get(id) ?: return false
+        sessions.remove(id)?.stop()
+        val folder = categories.get(categoryId)?.folder ?: return false
+        val destDir = File(filesDir.resolve("downloads"), folder).apply { mkdirs() }
+        val src = File(rec.destPath, rec.fileName)
+        val dest = File(destDir, rec.fileName)
+        if (src.exists() && src.absolutePath != dest.absolutePath) {
+            if (dest.exists() || !src.renameTo(dest)) return false
+        }
+        tasks.updateMeta(id, rec.fileName, rec.totalBytes, destDir.absolutePath)
+        tasks.updateCategory(id, categoryId)
         return true
     }
 

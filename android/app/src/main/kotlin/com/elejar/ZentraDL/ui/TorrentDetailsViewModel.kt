@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.TorrentRepository
+import com.elejar.ZentraDL.data.local.Category
 import com.elejar.ZentraDL.data.local.TaskRecord
 import com.elejar.ZentraDL.data.local.TorrentTask
 import com.elejar.ZentraDL.engine.model.DownloadProgress
@@ -38,6 +39,9 @@ class TorrentDetailsViewModel @Inject constructor(
     val trow: StateFlow<TorrentTask?> = trepo.observeTorrent(args.id)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    val categories: StateFlow<List<Category>> = repo.categories
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val progress: StateFlow<DownloadProgress?> = trepo.tprogress
         .map { it[args.id] }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -58,6 +62,24 @@ class TorrentDetailsViewModel @Inject constructor(
 
     fun pause() {
         viewModelScope.launch { trepo.cancelTorrent(args.id) }
+    }
+
+    /** Recheck = stop + restart (existing data is re-verified automatically). */
+    fun recheck(onStart: (String) -> Unit) {
+        viewModelScope.launch {
+            trepo.cancelTorrent(args.id)
+            // Let the old service pass settle so it doesn't stopSelf under the new run.
+            kotlinx.coroutines.delay(500)
+            onStart(args.id)
+        }
+    }
+
+    fun moveStorage(categoryId: String) {
+        viewModelScope.launch {
+            _events.send(
+                if (trepo.moveStorageToCategory(args.id, categoryId)) "Moved" else "Couldn't move",
+            )
+        }
     }
 
     fun retry(onStart: (String) -> Unit) {
