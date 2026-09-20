@@ -17,9 +17,10 @@ android {
 }
 dependencies {
     implementation(libs.okhttp)
-    implementation(libs.bt.core)
-    implementation(libs.bt.http.tracker)
-    implementation(libs.bt.dht)
+    // api: engine's public models expose bt types (MagnetRef.peers, sessions).
+    api(libs.bt.core)
+    api(libs.bt.http.tracker)
+    api(libs.bt.dht)
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.timber)
