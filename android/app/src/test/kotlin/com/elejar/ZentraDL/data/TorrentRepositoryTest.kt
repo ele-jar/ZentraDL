@@ -96,12 +96,17 @@ class TorrentRepositoryTest {
         val filesDir = Files.createTempDirectory("trepo").toFile()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
-            // Seed data + torrent (maker, 16 KiB pieces).
+            // Seed data + torrent (maker, 16 KiB pieces). Multi-file: storage
+            // root/<name>/ must match the on-disk layout or verify finds nothing.
             val root = Files.createTempDirectory("tswarm").toFile()
             val data = File(root, "data").apply { mkdirs() }
             File(data, "f.bin").writeBytes(ByteArray(30_000) { (it % 251).toByte() })
+            File(data, "sub").apply { mkdirs() }
+            File(data, "sub/g.bin").writeBytes(ByteArray(10_000) { (it % 127).toByte() })
             val bytes = TorrentBuilder().rootPath(data.toPath())
-                .addFile(File(data, "f.bin").toPath()).pieceSize(1 shl 14).build()
+                .addFile(File(data, "f.bin").toPath())
+                .addFile(File(data, "sub/g.bin").toPath())
+                .pieceSize(1 shl 14).build()
 
             val seedPort = freePort()
             val seeder = BtEngine(BtOptions(acceptorPort = seedPort, bindHost = "127.0.0.1", enableDht = false))
@@ -149,8 +154,8 @@ class TorrentRepositoryTest {
             }
             val stats = trepo.statsOf(id)
             assertThat(stats?.state).isEqualTo(TorrentRunState.SEEDING)
-            assertThat(stats?.piecesTotal).isEqualTo(2) // 30kB / 16KiB pieces
-            assertThat(trepo.pieceMapOf(id)?.complete).isEqualTo(2)
+            assertThat(stats?.piecesTotal).isEqualTo(3) // 40kB / 16KiB pieces
+            assertThat(trepo.pieceMapOf(id)?.complete).isEqualTo(3)
             assertThat(trepo.peersOf(id)).isNotNull()
 
             trepo.cancelTorrent(id)
