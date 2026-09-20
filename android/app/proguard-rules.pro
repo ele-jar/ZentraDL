@@ -12,3 +12,9 @@
 -dontwarn javax.naming.**
 -dontwarn org.slf4j.impl.**
 -dontwarn java.lang.reflect.AnnotatedType
+# Verified by bytecode diff: of 56 com.google.common.* refs in guice-5.0.1,
+# Streams is the ONLY one missing from the android-flavor guava, and it is
+# referenced solely from ChildBindingAlreadySetError's ctor (duplicate module
+# bindings — a wiring bug our JVM tests would catch first). Never loaded
+# on healthy paths, so dontwarn is safe here.
+-dontwarn com.google.common.collect.Streams

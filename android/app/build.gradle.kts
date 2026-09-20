@@ -66,7 +66,6 @@ dependencies {
     implementation(libs.media3.exoplayer); implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.exoplayer.dash); implementation(libs.media3.session)
     implementation(libs.workmanager)
-    implementation(libs.guava) // bt/Guice needs collect.Streams; keep direct so R8 sees it
     implementation(libs.webkit)
     implementation(libs.glance.appwidget)
     implementation(libs.serialization.json)
