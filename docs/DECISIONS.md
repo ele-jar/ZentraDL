@@ -41,3 +41,10 @@ module's graph (go.dev/issue/77183). Fix: pin pre-1.25-bump mobile (go 1.24.0,
 proxy-verified), install from it, add ephemeral `-tool gobind` dep inside
 core/upstream at build time (never committed; submodule pin stays pristine).
 Re-pin when our Go toolchain moves to 1.25/1.26.
+
+## D008 (2026-09-20) — `go get -tool` MUST carry @version
+CI: bare `go get -tool <pkg>` re-resolved x/mobile to latest mid-build
+(go 1.26.0 module, toolchain switch) while the gomobile binary stayed pinned —
+skewed build, bind died with a bogus ENOENT on the AAR path. Single pinned
+`go get -tool <pkg>@<ver>` command; script now also re-mkdirs out dir and
+fails loudly with `ls` if the AAR is missing.
