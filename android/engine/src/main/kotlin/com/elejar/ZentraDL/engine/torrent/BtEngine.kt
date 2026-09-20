@@ -106,6 +106,21 @@ class BtEngine(
     fun parseTorrentBytes(bytes: ByteArray): TorrentMeta = toMeta(metaService.fromByteArray(bytes), null)
 
     /**
+     * True while a (possibly stopped, tearing down) descriptor is registered.
+     * Registering a second client too soon throws IllegalStateException, so
+     * restarts wait for this to clear (unregister fires on TorrentStopped).
+     */
+    fun hasDescriptor(idHex: String): Boolean {
+        val rt = runtime ?: return false
+        return try {
+            rt.service(TorrentRegistry::class.java)
+                .getDescriptor(TorrentId.fromBytes(Protocols.fromHex(idHex))).isPresent
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
      * Fetch magnet metadata (own timeout; temp client detached after). Returns the
      * exchanged bytes too, so restarts don't re-fetch. Throws [MetadataTimeoutException].
      *

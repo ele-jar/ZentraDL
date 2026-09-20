@@ -19,6 +19,8 @@ import com.elejar.ZentraDL.engine.torrent.TorrentStats
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +29,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 
 /**
  * App-level torrent coordinator (P4). Metadata in Room ([TorrentTask]),
@@ -130,6 +134,17 @@ class TorrentRepository(
             return
         }
         stopSession(id)
+        // The stopped session unregisters async (TorrentStopped event); a new
+        // client registered too soon dies with IllegalStateException.
+        try {
+            withTimeout(30_000) {
+                while (engine.hasDescriptor(id)) delay(100)
+            }
+        } catch (e: TimeoutCancellationException) {
+            tasks.updateStatus(id, "failed")
+            tasks.updateError(id, "Still shutting down — try again")
+            return
+        }
         val bytes = row.torrentPath?.let { File(it).takeIf { f -> f.exists() }?.readBytes() }
         val selected = row.selectedPaths.split(",").filter { it.isNotEmpty() }.toSet().ifEmpty { null }
         val session = engine.download(
