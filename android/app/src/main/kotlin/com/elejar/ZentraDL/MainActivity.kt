@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -83,16 +84,15 @@ private fun GatedNav(pendingUrl: String?, settingsVm: SettingsViewModel = hiltVi
     val appLock by settingsVm.appLock.collectAsState()
     var unlocked by remember { mutableStateOf(false) }
     val activity = ctx as? ComponentActivity
+    val lockTitle = stringResource(R.string.app_lock_title)
+    val lockDesc = stringResource(R.string.app_lock_desc)
     val credLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) unlocked = true else activity?.finish()
     }
     @Suppress("DEPRECATION") // Keyguard credential avoids a Biometric dep; still functional.
     fun prompt() {
         val km = ctx.getSystemService(KeyguardManager::class.java)
-        val intent = km?.createConfirmDeviceCredentialIntent(
-            ctx.getString(R.string.app_lock_title),
-            ctx.getString(R.string.app_lock_desc),
-        )
+        val intent = km?.createConfirmDeviceCredentialIntent(lockTitle, lockDesc)
         if (intent != null) credLauncher.launch(intent) else unlocked = true
     }
     LaunchedEffect(appLock) {
