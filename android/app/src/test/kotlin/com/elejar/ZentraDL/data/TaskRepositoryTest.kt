@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
@@ -29,6 +30,7 @@ private class FakeDao : TaskDao {
     val records = mutableMapOf<String, TaskRecord>()
     private val flow = MutableStateFlow(emptyList<TaskRecord>())
     override fun observeAll(): Flow<List<TaskRecord>> = flow
+    override fun observe(id: String): Flow<TaskRecord?> = flow.map { list -> list.firstOrNull { it.id == id } }
     override suspend fun allOnce(): List<TaskRecord> = records.values.toList()
     override suspend fun get(id: String): TaskRecord? = records[id]
     override suspend fun insert(task: TaskRecord) {
@@ -41,6 +43,10 @@ private class FakeDao : TaskDao {
     }
     override suspend fun updateStatus(id: String, status: String) {
         records[id] = records[id]!!.copy(status = status)
+        emit()
+    }
+    override suspend fun updateError(id: String, error: String?) {
+        records[id] = records[id]!!.copy(error = error)
         emit()
     }
     override suspend fun updateMeta(id: String, name: String, total: Long, dest: String) {

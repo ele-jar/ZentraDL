@@ -173,6 +173,7 @@ class TaskRepository @Inject constructor(
         val rec = dao.get(id) ?: return
         try {
             dao.updateStatus(id, "downloading")
+            dao.updateError(id, null)
             val conns = connections.first()
             // Probe for accurate name/size (download() probes again internally; P2 dedups).
             val info = downloader.probe(rec.url, emptyMap())
@@ -188,6 +189,7 @@ class TaskRepository @Inject constructor(
             throw e
         } catch (e: Exception) {
             dao.updateStatus(id, "failed")
+            dao.updateError(id, e.message)
         } finally {
             jobs.remove(id)
             _progress.update { it - id }
