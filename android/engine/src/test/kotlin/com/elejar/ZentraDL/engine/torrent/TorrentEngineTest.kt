@@ -82,9 +82,11 @@ class TorrentEngineTest {
             val fetched = leecher.fetchMetadata(magnet, timeoutMs = 60_000)
             assertThat(fetched.meta.idHex).isEqualTo(meta.idHex)
             assertThat(fetched.meta.name).isEqualTo("data")
+            // Reuse the exchanged bytes: no second metadata round-trip, known piece length.
+            assertThat(fetched.rawBytes).isNotNull()
 
             val dest = Files.createTempDirectory("leech").toFile()
-            val session = leecher.download(TorrentDownloadSpec(magnet, null, dest))
+            val session = leecher.download(TorrentDownloadSpec(magnet, fetched.rawBytes, dest))
             withTimeout(120_000) {
                 while (session.stats.value.state != TorrentRunState.SEEDING) delay(500)
             }

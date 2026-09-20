@@ -224,17 +224,19 @@ class BtSession internal constructor(
         prevUp = up
         prevAt = now
         val left = s.left
+        val total = s.piecesTotal
         _stats.value = TorrentStats(
             downloadedBytes = dl,
             uploadedBytes = up,
             leftBytes = left,
             downRate = downRate,
             upRate = upRate,
-            piecesTotal = s.piecesTotal,
+            piecesTotal = total,
             piecesComplete = s.piecesComplete,
             peers = s.connectedPeers.size,
+            // NOTE: total == 0 means metadata not in yet — never SEEDING.
             state = when {
-                left == TorrentSessionState.UNKNOWN -> TorrentRunState.FETCHING
+                left == TorrentSessionState.UNKNOWN || total == 0 -> TorrentRunState.FETCHING
                 s.piecesRemaining == 0 -> TorrentRunState.SEEDING
                 else -> TorrentRunState.DOWNLOADING
             },
