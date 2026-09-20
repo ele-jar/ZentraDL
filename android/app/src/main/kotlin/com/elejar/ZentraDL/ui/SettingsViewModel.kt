@@ -42,6 +42,12 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 360)
     val speedLimitKbps: StateFlow<Int> = settings.speedLimitKbps
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    val appLock: StateFlow<Boolean> = settings.appLock
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setAppLock(v: Boolean) {
+        viewModelScope.launch { settings.setAppLock(v) }
+    }
 
     fun setWifiOnly(v: Boolean) {
         viewModelScope.launch { settings.setWifiOnly(v) }

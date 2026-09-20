@@ -62,6 +62,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val schedStart by vm.schedStartMin.collectAsState()
     val schedEnd by vm.schedEndMin.collectAsState()
     val speedKbps by vm.speedLimitKbps.collectAsState()
+    val appLock by vm.appLock.collectAsState()
     val themeTitle = stringResource(R.string.theme)
     val accentTitle = stringResource(R.string.accent)
 
@@ -242,7 +243,19 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
             }
-            if (matches("about", "version", "license")) {                item { SectionHeader(stringResource(R.string.about)) }
+            if (matches("privacy", "security", "lock", "vault")) {
+                item { SectionHeader(stringResource(R.string.privacy_section)) }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.app_lock),
+                        description = stringResource(R.string.app_lock_desc),
+                        checked = appLock,
+                        onCheckedChange = { vm.setAppLock(it) },
+                    )
+                }
+            }
+            if (matches("about", "version", "license")) {
+                item { SectionHeader(stringResource(R.string.about)) }
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text("ZentraDL ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)

@@ -35,6 +35,19 @@ class DownloadsUiTest {
         assertThat(all.filterIsInstance<DownloadsUi.ListItem.Row>()).hasSize(2)
     }
 
+    @Test fun vaultHiddenExceptUnderVaultFilter() {
+        val records = listOf(
+            rec("a", "completed"),
+            rec("b", "completed").copy(vaulted = true),
+        )
+        val all = DownloadsUi.buildList(records, emptyMap(), "", DownloadsUi.StatusFilter.All, DownloadsUi.SortMode.Date)
+            .filterIsInstance<DownloadsUi.ListItem.Row>().map { it.row.record.id }
+        assertThat(all).containsExactly("a")
+        val vault = DownloadsUi.buildList(records, emptyMap(), "", DownloadsUi.StatusFilter.Vault, DownloadsUi.SortMode.Date)
+            .filterIsInstance<DownloadsUi.ListItem.Row>().map { it.row.record.id }
+        assertThat(vault).containsExactly("b")
+    }
+
     @Test fun activeFirstThenDayBuckets() {
         val now = 1_750_000_000_000L
         val records = listOf(

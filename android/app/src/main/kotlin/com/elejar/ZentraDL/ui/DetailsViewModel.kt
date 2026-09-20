@@ -62,6 +62,18 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
+    fun moveToVault(vaulted: Boolean) {
+        viewModelScope.launch {
+            _events.send(
+                if (repo.setVaulted(args.id, vaulted)) {
+                    if (vaulted) "Moved to vault" else "Removed from vault"
+                } else {
+                    "Couldn't move right now"
+                },
+            )
+        }
+    }
+
     fun pause() {
         viewModelScope.launch { repo.pause(args.id) }
     }

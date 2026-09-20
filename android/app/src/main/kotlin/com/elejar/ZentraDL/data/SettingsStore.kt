@@ -32,6 +32,7 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     private val schedStartKey = intPreferencesKey("sched_start_min")
     private val schedEndKey = intPreferencesKey("sched_end_min")
     private val speedLimitKbpsKey = intPreferencesKey("speed_limit_kbps")
+    private val appLockKey = booleanPreferencesKey("app_lock")
 
     val connections: Flow<Int> = ctx.prefs.data.map { it[connectionsKey] ?: 8 }
     val maxRunning: Flow<Int> = ctx.prefs.data.map { it[maxRunningKey] ?: 3 }
@@ -47,6 +48,7 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     val schedEndMin: Flow<Int> = ctx.prefs.data.map { it[schedEndKey] ?: 360 }
     /** 0 = unlimited. */
     val speedLimitKbps: Flow<Int> = ctx.prefs.data.map { it[speedLimitKbpsKey] ?: 0 }
+    val appLock: Flow<Boolean> = ctx.prefs.data.map { it[appLockKey] ?: false }
 
     /** Combined queue-gate policy (P3d). */
     val gatePolicy: Flow<GatePolicy> = combine(
@@ -105,5 +107,9 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
 
     suspend fun setSpeedLimitKbps(v: Int) {
         ctx.prefs.edit { it[speedLimitKbpsKey] = v.coerceIn(0, 102_400) }
+    }
+
+    suspend fun setAppLock(v: Boolean) {
+        ctx.prefs.edit { it[appLockKey] = v }
     }
 }

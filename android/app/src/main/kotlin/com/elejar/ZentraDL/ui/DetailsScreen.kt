@@ -116,6 +116,19 @@ fun DetailsScreen(
                             onClick = { menu = false; move = true },
                         )
                         DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (rec?.vaulted == true) R.string.unvault else R.string.move_to_vault,
+                                    ),
+                                )
+                            },
+                            onClick = {
+                                menu = false
+                                rec?.let { vm.moveToVault(!it.vaulted) }
+                            },
+                        )
+                        DropdownMenuItem(
                             text = { Text(stringResource(R.string.share_file)) },
                             onClick = {
                                 menu = false

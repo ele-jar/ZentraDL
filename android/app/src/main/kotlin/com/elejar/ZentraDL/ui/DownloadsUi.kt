@@ -7,7 +7,7 @@ import com.elejar.ZentraDL.engine.model.DownloadProgress
 /** Pure list logic (unit-tested). The screen only renders [ListItem]s. */
 object DownloadsUi {
 
-    enum class StatusFilter { All, Active, Queued, Paused, Completed, Failed }
+    enum class StatusFilter { All, Active, Queued, Paused, Completed, Failed, Vault }
 
     enum class SortMode { Date, Name, Size, Progress, Speed }
 
@@ -59,6 +59,12 @@ object DownloadsUi {
         val rows = records.mapNotNull { rec ->
             val status = mapStatus(rec.status)
             if (!matchesFilter(status, filter)) return@mapNotNull null
+            // Vaulted tasks live only under the Vault filter (P3e; app lock guards the app).
+            if (filter == StatusFilter.Vault) {
+                if (!rec.vaulted) return@mapNotNull null
+            } else if (rec.vaulted) {
+                return@mapNotNull null
+            }
             if (categoryId != null && rec.categoryId != categoryId) return@mapNotNull null
             if (q.isNotEmpty() && !rec.fileName.lowercase().contains(q) && !rec.url.lowercase().contains(q)) {
                 return@mapNotNull null
@@ -102,6 +108,7 @@ object DownloadsUi {
 
     private fun matchesFilter(status: TaskStatus, filter: StatusFilter): Boolean = when (filter) {
         StatusFilter.All -> true
+        StatusFilter.Vault -> true
         StatusFilter.Active -> status == TaskStatus.Downloading
         StatusFilter.Queued -> status == TaskStatus.Queued
         StatusFilter.Paused -> status == TaskStatus.Paused

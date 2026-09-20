@@ -197,6 +197,28 @@ class TaskRepository @Inject constructor(
         dao.updateExpectedSha(id, hex?.trim()?.lowercase()?.takeIf { it.isNotBlank() })
     }
 
+    /**
+     * Move a task's file into/out of the private vault (app-private + .nomedia).
+     * Never moves a running transfer. False = blocked (running or name clash).
+     */
+    suspend fun setVaulted(id: String, vaulted: Boolean): Boolean {
+        val rec = dao.get(id) ?: return false
+        if (rec.vaulted == vaulted) return true
+        if (jobs.containsKey(id)) return false
+        val vault = File(defaultDir.parentFile, "vault").apply { mkdirs() }
+        File(vault, ".nomedia").takeIf { !it.exists() }?.createNewFile()
+        val folder = categoryDao?.get(rec.categoryId)?.folder ?: "Other"
+        val destDir = (if (vaulted) vault else File(defaultDir, folder)).apply { mkdirs() }
+        val src = File(rec.destPath, rec.fileName)
+        val dest = File(destDir, rec.fileName)
+        if (src.exists() && src.absolutePath != dest.absolutePath) {
+            if (dest.exists() || !src.renameTo(dest)) return false
+        }
+        dao.updateMeta(id, rec.fileName, rec.totalBytes, destDir.absolutePath)
+        dao.updateVaulted(id, vaulted)
+        return true
+    }
+
     /** Starts (or joins) the single execution of [id]; waits for a queue slot first. */
     suspend fun run(id: String) {
         queueMutex.withLock { jobs[id] }?.join()?.let { return }

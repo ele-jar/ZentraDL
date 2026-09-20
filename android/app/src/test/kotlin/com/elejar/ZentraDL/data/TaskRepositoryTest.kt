@@ -234,4 +234,21 @@ class TaskRepositoryTest {
             .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
         assertThat(r.sha256Of("missing")).isNull()
     }
+
+    @Test fun vault_movesFileAndFlags(): Unit = runBlocking {
+        val dao = FakeDao()
+        val r = repo(FakeDownloader(ResourceInfo("https://x/f", "f", 1, null, false)), dao)
+        val id = r.enqueue("https://x/secret.bin")
+        dao.updateStatus(id, "completed")
+        val rec = dao.get(id)!!
+        File(rec.destPath, rec.fileName).apply { parentFile!!.mkdirs(); writeText("x") }
+        assertThat(r.setVaulted(id, true)).isTrue()
+        val vaulted = dao.get(id)!!
+        assertThat(vaulted.vaulted).isTrue()
+        assertThat(File(vaulted.destPath, vaulted.fileName).exists()).isTrue()
+        assertThat(r.setVaulted(id, false)).isTrue()
+        val back = dao.get(id)!!
+        assertThat(back.vaulted).isFalse()
+        assertThat(File(back.destPath, back.fileName).exists()).isTrue()
+    }
 }
