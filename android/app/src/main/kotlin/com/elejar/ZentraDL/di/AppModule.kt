@@ -14,6 +14,7 @@ import com.elejar.ZentraDL.engine.http.HttpDownloader
 import com.elejar.ZentraDL.engine.http.SpeedLimiter
 import com.elejar.ZentraDL.engine.model.Downloader
 import com.elejar.ZentraDL.engine.torrent.BtEngine
+import com.elejar.ZentraDL.engine.torrent.BtOptions
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
