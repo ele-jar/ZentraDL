@@ -36,6 +36,7 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     private val dhtEnabledKey = booleanPreferencesKey("dht_enabled")
     private val maxPeersKey = intPreferencesKey("max_peers_torrent")
     private val seedGoalKey = intPreferencesKey("seed_goal_ratio")
+    private val adblockKey = booleanPreferencesKey("adblock_enabled")
 
     val connections: Flow<Int> = ctx.prefs.data.map { it[connectionsKey] ?: 8 }
     val maxRunning: Flow<Int> = ctx.prefs.data.map { it[maxRunningKey] ?: 3 }
@@ -56,6 +57,7 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     val maxPeers: Flow<Int> = ctx.prefs.data.map { it[maxPeersKey] ?: 50 }
     /** Seed goal ratio ×100 (0 = seed forever). */
     val seedGoal: Flow<Int> = ctx.prefs.data.map { it[seedGoalKey] ?: 0 }
+    val adblock: Flow<Boolean> = ctx.prefs.data.map { it[adblockKey] ?: true }
 
     /** Combined queue-gate policy (P3d). */
     val gatePolicy: Flow<GatePolicy> = combine(
@@ -130,5 +132,9 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
 
     suspend fun setSeedGoal(v: Int) {
         ctx.prefs.edit { it[seedGoalKey] = v.coerceIn(0, 1000) }
+    }
+
+    suspend fun setAdblock(v: Boolean) {
+        ctx.prefs.edit { it[adblockKey] = v }
     }
 }

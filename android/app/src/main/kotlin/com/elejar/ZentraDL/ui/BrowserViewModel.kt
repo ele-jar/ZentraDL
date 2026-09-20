@@ -2,16 +2,21 @@ package com.elejar.ZentraDL.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.local.Bookmark
 import com.elejar.ZentraDL.data.local.BookmarkDao
 import com.elejar.ZentraDL.data.local.HistoryDao
 import com.elejar.ZentraDL.data.local.HistoryEntry
+import com.elejar.ZentraDL.domain.MediaSniffer
+import com.elejar.ZentraDL.engine.http.HlsDownloader
+import com.elejar.ZentraDL.engine.http.HlsVariant
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Browser state (P5a shell; tabs keep URL+title, web state reloads on switch). */
@@ -19,6 +24,7 @@ import kotlinx.coroutines.launch
 class BrowserViewModel @Inject constructor(
     private val bookmarks: BookmarkDao,
     private val history: HistoryDao,
+    private val settings: SettingsStore,
 ) : ViewModel() {
 
     private val _tabs = MutableStateFlow(listOf(WebTab(1, "")))
@@ -41,11 +47,52 @@ class BrowserViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val historyList: StateFlow<List<HistoryEntry>> = history.observeRecent()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val adblock: StateFlow<Boolean> = settings.adblock
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    /** Sniffed media candidates on the current page (B3-lite). */
+    data class MediaCandidate(val url: String, val kind: MediaSniffer.Kind)
+
+    private val _candidates = MutableStateFlow(emptyList<MediaCandidate>())
+    val candidates: StateFlow<List<MediaCandidate>> = _candidates
+
+    private val hls = HlsDownloader()
+
+    private val _variants = MutableStateFlow<List<HlsVariant>>(emptyList())
+    val variants: StateFlow<List<HlsVariant>> = _variants
+
+    fun onCandidate(url: String) {
+        val kind = MediaSniffer.kindOf(url) ?: return
+        if (!MediaSniffer.sniffable(url)) return
+        _candidates.update { cur ->
+            if (cur.any { it.url == url }) cur else cur + MediaCandidate(url, kind)
+        }
+    }
+
+    fun clearCandidates() {
+        _candidates.value = emptyList()
+        _variants.value = emptyList()
+    }
+
+    fun fetchVariants(playlistUrl: String) {
+        viewModelScope.launch {
+            _variants.value = try {
+                hls.variants(playlistUrl)
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    fun setAdblock(v: Boolean) {
+        viewModelScope.launch { settings.setAdblock(v) }
+    }
 
     fun currentTab(): WebTab? = _tabs.value.firstOrNull { it.id == _selected.value }
 
     fun go(input: String) {
         val url = normalize(input)
+        clearCandidates()
         val tab = currentTab()
         if (tab == null) {
             val (tabs, sel) = BrowserTabs.open(_tabs.value, url, nextId++)

@@ -132,6 +132,13 @@
     <string name="browser_welcome">Browse, then download anything.</string>
     <string name="forward">Forward</string>
     <string name="reload">Reload</string>
+    <string name="block_ads">Block ads</string>
+    <string name="sniffed_n">%1$d media files</string>
+    <string name="playlist_kind">Playlist — tap for quality</string>
+    <string name="media_kind">Media file</string>
+    <string name="pick_quality">Pick quality</string>
+    <string name="audio_only">Audio</string>
+    <string name="mbps">%1$.1f Mbps</string>
     <string name="recheck">Recheck</string>
     <string name="move_storage">Move storage…</string>
     <string name="export_torrent">Export .torrent</string>

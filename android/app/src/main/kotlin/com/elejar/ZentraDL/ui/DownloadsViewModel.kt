@@ -125,8 +125,7 @@ class DownloadsViewModel @Inject constructor(
         categoryId: String? = null,
         allowDuplicate: Boolean = false,
         onEnqueued: (String) -> Unit,
-    ) {
-        viewModelScope.launch {
+    ) {        viewModelScope.launch {
             val clean = url.trim()
             if (clean.isBlank()) {
                 _events.send(Event.Message("Enter a link first"))
@@ -174,6 +173,24 @@ class DownloadsViewModel @Inject constructor(
             val urls = repo.allUrls()
             if (urls.isEmpty()) _events.send(Event.Message("Nothing to export"))
             else onShare(urls.joinToString("\n"))
+        }
+    }
+
+    /** Enqueue an HLS variant (kind hls, bandwidth in extra). */
+    fun addHls(mediaUrl: String, bandwidthBps: Long, onEnqueued: (String) -> Unit) {
+        viewModelScope.launch {
+            val clean = mediaUrl.trim()
+            if (clean.isBlank()) {
+                _events.send(Event.Message("Enter a link first"))
+                return@launch
+            }
+            try {
+                val base = clean.substringAfterLast('/').substringBefore('?').ifBlank { "stream" }
+                val name = base.substringBeforeLast('.').ifBlank { "stream" } + ".ts"
+                onEnqueued(repo.enqueue(clean, name, null, kind = "hls", extra = "bw=$bandwidthBps"))
+            } catch (e: Exception) {
+                _events.send(Event.Message("Couldn't add stream: ${e.message}"))
+            }
         }
     }
 

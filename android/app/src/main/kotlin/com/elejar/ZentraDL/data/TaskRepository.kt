@@ -9,6 +9,8 @@ import com.elejar.ZentraDL.domain.GateBlock
 import com.elejar.ZentraDL.domain.GatePolicy
 import com.elejar.ZentraDL.domain.GatePolicyCheck
 import com.elejar.ZentraDL.domain.NetState
+import com.elejar.ZentraDL.engine.http.HlsDownloader
+import com.elejar.ZentraDL.engine.http.HlsSpec
 import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.DownloadSpec
 import com.elejar.ZentraDL.engine.model.Downloader
@@ -53,6 +55,7 @@ class TaskRepository @Inject constructor(
     private val categoryDao: CategoryDao? = null,
     policy: Flow<GatePolicy> = flowOf(GatePolicy()),
     netStates: Flow<NetState> = flowOf(NetState(connected = true, unmetered = true, charging = false)),
+    private val hls: HlsDownloader = HlsDownloader(),
 ) {
     val records: Flow<List<TaskRecord>> = dao.observeAll()
     val categories: Flow<List<Category>> = categoryDao?.observeAll() ?: flowOf(emptyList())
@@ -107,6 +110,8 @@ class TaskRepository @Inject constructor(
         name: String? = null,
         categoryId: String? = null,
         allowDuplicate: Boolean = false,
+        kind: String = "http",
+        extra: String = "",
     ): String {
         val clean = url.trim()
         if (!allowDuplicate) {
@@ -122,7 +127,7 @@ class TaskRepository @Inject constructor(
                 id = id, url = clean, fileName = guess,
                 destPath = File(defaultDir, folder).absolutePath, status = "queued",
                 totalBytes = -1, createdAt = System.currentTimeMillis(),
-                categoryId = cat,
+                categoryId = cat, kind = kind, extra = extra,
             ),
         )
         return id
@@ -161,6 +166,30 @@ class TaskRepository @Inject constructor(
     }
 
     /** Rename a task (and its file when already downloaded). False = invalid/blocked. */
+    /** HLS run: no probe (playlist is not the media); bandwidth comes from [TaskRecord.extra]. */
+    private suspend fun runHls(id: String, rec: TaskRecord) {
+        try {
+            dao.updateStatus(id, "downloading")
+            dao.updateError(id, null)
+            val bw = rec.extra.substringAfter("bw=", "").substringBefore(';').toLongOrNull() ?: 0L
+            val destDir = File(rec.destPath).apply { mkdirs() }
+            hls.download(HlsSpec(rec.url, File(destDir, rec.fileName), bw)).collect { p ->
+                _progress.update { it + (id to p) }
+            }
+            dao.updateStatus(id, "completed")
+        } catch (e: CancellationException) {
+            dao.updateStatus(id, "paused")
+            throw e
+        } catch (e: Exception) {
+            dao.updateStatus(id, "failed")
+            dao.updateError(id, e.message)
+        } finally {
+            jobs.remove(id)
+            _progress.update { it - id }
+            pump()
+        }
+    }
+
     suspend fun rename(id: String, newName: String): Boolean {
         val clean = newName.trim()
         if (clean.isBlank() || clean.contains('/') || clean.contains('\\') || clean == "." || clean == "..") {
@@ -316,6 +345,10 @@ class TaskRepository @Inject constructor(
         // Admitted while clear, blocked since: park back in queue (banner explains).
         if (_gateBlock.value != null) {
             dao.updateStatus(id, "queued")
+            return
+        }
+        if (rec.kind == "hls") {
+            runHls(id, rec)
             return
         }
         try {

@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
@@ -30,13 +31,16 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -45,6 +49,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -55,11 +60,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,19 +75,38 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.elejar.ZentraDL.R
+import com.elejar.ZentraDL.domain.AdBlock
+import com.elejar.ZentraDL.domain.MediaSniffer
 import com.elejar.ZentraDL.service.DownloadService
 
-private enum class BrowserSheet { None, Tabs, Bookmarks, History }
+private enum class BrowserSheet { None, Tabs, Bookmarks, History, Media }
+
+/** DOM media collector (video/audio/source tags + media links). */
+private const val JS_COLLECT =
+    "(function(){var u=new Array();" +
+        "document.querySelectorAll('video,audio').forEach(function(e){" +
+        "if(e.src)u.push(e.src);if(e.currentSrc)u.push(e.currentSrc)});" +
+        "document.querySelectorAll('source').forEach(function(e){if(e.src)u.push(e.src)});" +
+        "document.querySelectorAll('a[href]').forEach(function(a){" +
+        "var h=a.href;" +
+        "if(/\\.(m3u8|mpd|mp4|webm|mkv|mov|mp3|m4a)(\\?|$)/i.test(h))u.push(h)});" +
+        "return JSON.stringify(u)})()"
 
 /** Browser shell (P5a: one live WebView, tabs reload on switch, interception → Add sheet). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
+fun BrowserScreen(
+    vm: BrowserViewModel = hiltViewModel(),
+    dlVm: DownloadsViewModel = hiltViewModel(),
+) {
     val tabs by vm.tabs.collectAsState()
     val selected by vm.selected.collectAsState()
     val bookmarks by vm.bookmarkList.collectAsState()
     val history by vm.historyList.collectAsState()
     val intercepted by vm.intercepted.collectAsState()
+    val candidates by vm.candidates.collectAsState()
+    val adblock by vm.adblock.collectAsState()
+    val adblockRef = rememberUpdatedState(adblock)
     val ctx = LocalContext.current
     var address by remember { mutableStateOf("") }
     var progress by remember { mutableIntStateOf(0) }
@@ -126,6 +152,14 @@ fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
                     IconButton(onClick = { sheet = BrowserSheet.Tabs }) {
                         Text("${tabs.size}", style = MaterialTheme.typography.titleMedium)
                     }
+                    if (candidates.isNotEmpty()) {
+                        IconButton(onClick = { sheet = BrowserSheet.Media }) {
+                            Icon(
+                                Icons.Filled.VideoLibrary,
+                                contentDescription = stringResource(R.string.sniffed_n, candidates.size),
+                            )
+                        }
+                    }
                     var menu by remember { mutableStateOf(false) }
                     IconButton(onClick = { menu = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.more_actions_simple))
@@ -146,6 +180,16 @@ fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
                                 tab?.let { vm.toggleBookmark(it.url, it.title) }
                             },
                             enabled = !tab?.url.isNullOrBlank(),
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.block_ads)) },
+                            trailingIcon = {
+                                androidx.compose.material3.Switch(
+                                    checked = adblock,
+                                    onCheckedChange = null,
+                                )
+                            },
+                            onClick = { vm.setAdblock(!adblock) },
                         )
                     }
                 }
@@ -209,6 +253,18 @@ fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
                                     }
                                 }
 
+                                override fun shouldInterceptRequest(v: WebView, r: WebResourceRequest): WebResourceResponse? {
+                                    val u = r.url.toString()
+                                    if (adblockRef.value && AdBlock.shouldBlock(u)) {
+                                        return WebResourceResponse(
+                                            "text/plain", "utf-8", 204, "No Content",
+                                            emptyMap(), ByteArray(0).inputStream(),
+                                        )
+                                    }
+                                    if (MediaSniffer.sniffable(u)) vm.onCandidate(u)
+                                    return null
+                                }
+
                                 override fun onPageStarted(v: WebView, u: String, icon: Bitmap?) {
                                     address = u
                                 }
@@ -218,6 +274,15 @@ fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
                                     webRef?.let {
                                         canGoBack = it.canGoBack()
                                         canGoForward = it.canGoForward()
+                                    }
+                                    // B3-lite: collect <video>/<audio>/<source> + media links.
+                                    v.evaluateJavascript(JS_COLLECT) { json ->
+                                        runCatching {
+                                            val arr = org.json.JSONArray(json)
+                                            for (i in 0 until arr.length()) {
+                                                vm.onCandidate(arr.optString(i))
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -267,6 +332,22 @@ fun BrowserScreen(vm: BrowserViewModel = hiltViewModel()) {
             history = history,
             onOpen = { vm.go(it); sheet = BrowserSheet.None },
             onClear = { vm.clearHistory() },
+            onDismiss = { sheet = BrowserSheet.None },
+        )
+        BrowserSheet.Media -> MediaSheet(
+            candidates = candidates,
+            onDownloadDirect = { urls ->
+                dlVm.addBatch(urls.joinToString("\n"), null, startFirst = true) {
+                    withNotifPerm { DownloadService.start(ctx, it) }
+                }
+                sheet = BrowserSheet.None
+            },
+            onPlaylist = { url -> vm.fetchVariants(url) },
+            variants = vm.variants.collectAsState().value,
+            onVariant = { mediaUrl, bw ->
+                dlVm.addHls(mediaUrl, bw) { withNotifPerm { DownloadService.start(ctx, it) } }
+                sheet = BrowserSheet.None
+            },
             onDismiss = { sheet = BrowserSheet.None },
         )
         BrowserSheet.None -> Unit
@@ -396,10 +477,108 @@ private fun BookmarksSheet(
     }
 }
 
+/** Sniffed-media sheet (B3-lite): batch direct files, quality-pick playlists). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HistorySheet(
-    history: List<com.elejar.ZentraDL.data.local.HistoryEntry>,
+private fun MediaSheet(
+    candidates: List<BrowserViewModel.MediaCandidate>,
+    onDownloadDirect: (List<String>) -> Unit,
+    onPlaylist: (String) -> Unit,
+    variants: List<com.elejar.ZentraDL.engine.http.HlsVariant>,
+    onVariant: (String, Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var checked by remember(candidates) { mutableStateOf(candidates.map { it.url }.toSet()) }
+    var playlist by remember { mutableStateOf<String?>(null) }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(
+                stringResource(R.string.sniffed_n, candidates.size),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                items(candidates, key = { it.url }) { c ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        androidx.compose.material3.Checkbox(
+                            checked = c.url in checked,
+                            onCheckedChange = {
+                                checked = if (it) checked + c.url else checked - c.url
+                            },
+                        )
+                        Column(Modifier.weight(1f).clickable {
+                            if (c.kind == MediaSniffer.Kind.Playlist) {
+                                playlist = c.url
+                                onPlaylist(c.url)
+                            }
+                        }) {
+                            Text(
+                                c.url,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                if (c.kind == MediaSniffer.Kind.Playlist) stringResource(R.string.playlist_kind)
+                                else stringResource(R.string.media_kind),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+            }
+            val direct = candidates.filter { it.kind == MediaSniffer.Kind.Media && it.url in checked }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { onDownloadDirect(direct.map { it.url }) },
+                    enabled = direct.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.download_n, direct.size)) }
+            }
+        }
+    }
+    playlist?.let { p ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { playlist = null },
+            title = { Text(stringResource(R.string.pick_quality)) },
+            text = {
+                Column {
+                    if (variants.isEmpty()) {
+                        Text(stringResource(R.string.loading))
+                    }
+                    variants.forEach { v ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { onVariant(v.url, v.bandwidthBps); playlist = null }
+                                .padding(vertical = 8.dp),
+                        ) {
+                            Text(
+                                v.resolution ?: stringResource(R.string.audio_only),
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                stringResource(R.string.mbps, v.bandwidthBps / 1_000_000f),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { playlist = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistorySheet(    history: List<com.elejar.ZentraDL.data.local.HistoryEntry>,
     onOpen: (String) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit,
