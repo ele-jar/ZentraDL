@@ -33,3 +33,11 @@ CI: `platforms;android-37` not found. Checked Google's repository2-1.xml
 directly: stable platforms stop at android-36, `android-37` appears 0 times
 (only build-tools 37 exists). NDK 29.0.14206865 confirmed present. If a future
 dep demands minCompileSdk 37, revisit the BOM instead.
+
+## D007 (2026-09-20) — pin x/mobile to v0.0.0-20260209203831-923679eb55af
+CI: `go install .../gomobile@latest` pulled Sep-2026 mobile (needs go>=1.26,
+toolchain auto-switched) and new gomobile demands x/mobile in the target
+module's graph (go.dev/issue/77183). Fix: pin pre-1.25-bump mobile (go 1.24.0,
+proxy-verified), install from it, add ephemeral `-tool gobind` dep inside
+core/upstream at build time (never committed; submodule pin stays pristine).
+Re-pin when our Go toolchain moves to 1.25/1.26.

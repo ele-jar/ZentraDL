@@ -1,20 +1,34 @@
 #!/usr/bin/env bash
-# scripts/build-core.sh — build Gopeed AAR via gomobile (verified command, upstream README+CI).
+# scripts/build-core.sh — build Gopeed AAR via gomobile.
+# Upstream command (README+CI) uses @latest; we PIN x/mobile (see MOBILE_VERSION):
+# @latest (Sep 2026) needs go>=1.26 and our toolchain is go1.24.9 per core/upstream/go.mod.
 # Usage: bash scripts/build-core.sh [--out <dir>]  (default out: <root>/android/app/libs)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$ROOT/scripts/env.sh"
+# x/mobile @ 2026-02-09 (go directive 1.24.0; last line before the 1.25.0 bump).
+# Verified via proxy: v0.0.0-20260209203831-923679eb55af.
+MOBILE_VERSION="${MOBILE_VERSION:-v0.0.0-20260209203831-923679eb55af}"
 OUT="$ROOT/android/app/libs"
 while [ $# -gt 0 ]; do case "$1" in --out) OUT="$2"; shift 2;; *) echo "unknown arg $1"; exit 1;; esac; done
 mkdir -p "$OUT"
-if ! command -v gomobile >/dev/null 2>&1; then
-  go install golang.org/x/mobile/cmd/gomobile@latest
-  go get golang.org/x/mobile/bind 2>/dev/null || true
-  gomobile init
-fi
+# Install (pinned) gomobile binary.
+go install "golang.org/x/mobile/cmd/gomobile@$MOBILE_VERSION"
+# Current gomobile requires x/mobile in the target module's graph (go.dev/issue/77183).
+# This adds a LOCAL-ONLY tool dep to core/upstream/go.mod+go.sum (ephemeral in CI;
+# never commit it — the submodule pin stays pristine).
+(
+  cd "$ROOT/core/upstream"
+  go get "golang.org/x/mobile@$MOBILE_VERSION"
+  go get -tool golang.org/x/mobile/cmd/gobind
+)
+gomobile init
 # NDK r28+ required for 16 KB page-size alignment (Play-enforced for Android 15+ targets).
-gomobile bind -tags nosqlite -ldflags="-w -s -checklinkname=0" \
-  -o "$OUT/libgopeed.aar" -target=android -androidapi 21 -javapkg="com.gopeed" \
-  github.com/GopeedLab/gopeed/bind/mobile
+(
+  cd "$ROOT/core/upstream"
+  gomobile bind -tags nosqlite -ldflags="-w -s -checklinkname=0" \
+    -o "$OUT/libgopeed.aar" -target=android -androidapi 21 -javapkg="com.gopeed" \
+    github.com/GopeedLab/gopeed/bind/mobile
+)
 echo "AAR -> $OUT/libgopeed.aar"
