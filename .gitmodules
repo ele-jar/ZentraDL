@@ -1,3 +1,0 @@
-[submodule "core/upstream"]
-	path = core/upstream
-	url = https://github.com/GopeedLab/gopeed.git

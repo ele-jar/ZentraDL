@@ -48,3 +48,14 @@ CI: bare `go get -tool <pkg>` re-resolved x/mobile to latest mid-build
 skewed build, bind died with a bogus ENOENT on the AAR path. Single pinned
 `go get -tool <pkg>@<ver>` command; script now also re-mkdirs out dir and
 fails loudly with `ls` if the AAR is missing.
+
+## D009 (2026-09-20) — resolve script --out to absolute (bind cwd differs)
+CI trace showed `-o android/app/libs/...` relative: workflow passes a relative
+--out, bind cd's into core/upstream, AAR landed in the submodule. Force absolute.
+
+## D010 (2026-09-20) — DROP Go/gomobile: Android-only, Kotlin-only (user instruction)
+gomobile cost 5 failed CI rounds; user ordered pure Kotlin. Removed: `core/`
+Gopeed submodule, `core-aar` CI job, Go setup/NDK from workflow, build-core
+scripts. `:engine` is now a pure-Kotlin transfer engine (OkHttp multi-part
+HTTP now; JVM BitTorrent client in Phase 4 — replaces anacrolix; candidates
+TBD). `docs/GOPEED_*.md` = history only. This supersedes BRIEF §4.1/§4.2 (Go core).

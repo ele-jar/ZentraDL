@@ -1,11 +1,14 @@
 # ARCHITECTURE.md — ZentraDL (condensed; full spec docs/BRIEF.md §4)
 
 Modules: `:app` (features package-by-feature: `feature/downloads|browser|torrents|settings/*/ui|domain|data`),
-`:engine` (AAR wrapper + `EngineClient` per `docs/ENGINE_API.md`), `:designsystem`
-(theme/tokens/components incl. PiecesMap Canvas). `core/` = Gopeed @v1.9.3 submodule.
+`:engine` (pure-Kotlin transfer engine: OkHttp multi-part HTTP downloader, later a JVM
+BitTorrent client; models per `docs/ENGINE_API.md`), `:designsystem`
+(theme/tokens/components incl. PiecesMap Canvas). D010: the Gopeed Go core
+(`core/` submodule, gomobile AAR) was dropped per user instruction — Android-only,
+Kotlin-only. `docs/GOPEED_*.md` remain as research history only.
 
-State: core owns transfers (in-process Dispatch + SubscribeTaskEvents; TCP+token
-fallback loopback-only). Room = app metadata keyed by taskId (categories/tags/rules/
+State: `:engine` owns transfers (foreground service + WorkManager/UIDT jobs, §4.5).
+Room = app metadata keyed by taskId (categories/tags/rules/
 history/stats), reconciled on startup; never duplicate progress. Settings in DataStore.
 
 Background: foreground service ONLY while active (dataSync type + `FOREGROUND_SERVICE_DATA_SYNC`

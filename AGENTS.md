@@ -8,19 +8,16 @@ arm64-v8a, armeabi-v7a, x86_64. Full spec: `docs/BRIEF.md`.
 Status: `docs/PROGRESS.md` (one row per feature, TODO/DOING/DONE/PARTIAL/BLOCKED).
 Decisions: `docs/DECISIONS.md`. Setup: `SETUP.md`.
 
-## Architecture (brief 4.x)
+## Architecture (brief 4.x, as amended by D010: Kotlin-only, no Go core)
 
-- `core/` — Gopeed fork pinned to a release tag (submodule; stay
-  upstream-mergeable; our patches in separate files, listed in
-  `docs/CORE_PATCHES.md`). Go core + REST/WebSocket API + extensions.
-  Built to AAR via `gomobile bind` (`scripts/build-core.sh`).
 - `android/` — Gradle project: `:app` (features, package-by-feature),
-  `:engine` (AAR wrapper + `EngineClient` OkHttp/serialization + models),
-  `:designsystem` (theme/tokens/components incl. PiecesMap Canvas).
-- Core owns transfer state (loopback only + auth token). Room stores app
-  metadata (categories/tags/rules/history/stats) keyed by taskId.
-- Contract first: `docs/ENGINE_API.md` (endpoints, JSON, piece-map RLE)
-  before splitting Go/Kotlin/UI work.
+  `:engine` (pure-Kotlin transfer engine: OkHttp multi-part HTTP; JVM BitTorrent
+  client lands in Phase 4), `:designsystem` (theme/tokens/components incl.
+  PiecesMap Canvas).
+- `:engine` owns transfer state. Room stores app metadata (categories/tags/
+  rules/history/stats) keyed by taskId.
+- Contract: `docs/ENGINE_API.md` (endpoints, JSON, piece-map RLE) — now
+  implemented in Kotlin instead of Go patches.
 
 ## Working folder rules (brief 13 — binding)
 
@@ -73,7 +70,6 @@ Engineering rules: `android-compose-engineering`. Engine facts: `gopeed-core-not
 source scripts/env.sh
 gradle assembleDebug          # full APK (CI; NOT on termux host; no wrapper jar yet — CI's setup-gradle provides gradle)
 gradle testDebugUnitTest lint # unit + lint
-(cd core && go vet ./... && go test ./...)  # Go patches
 ```
 
 ## Coding rules (short)

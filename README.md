@@ -6,11 +6,10 @@
 Pieces map, Gopeed Go-core engine (pinned `v1.9.3` in `core/`), optional on-device smart
 automation, polished Material You UI. No ads, no tracking.
 
-## Build (CI; local builds need JDK17 + SDK + Go — see SETUP.md)
+## Build (CI; local builds need JDK17 + SDK — see SETUP.md)
 
 ```bash
 source scripts/env.sh
-bash scripts/build-core.sh --out android/app/libs  # libgopeed.aar
 gradle testDebugUnitTest lint                        # (CI uses gradle, no wrapper jar yet)
 gradle assembleDebug assembleRelease
 bash scripts/collect-apks.sh                         # dist/*.apk + SHA256SUMS

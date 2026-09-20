@@ -5,7 +5,8 @@
 
 | ID | Name | Status | Notes |
 |---|---|---|---|
-| P0 | Foundations (skills A-C, agents, env, AGENTS.md, Gradle skeleton, CI, Gopeed pin+analysis, FEATURES catalogue) | DOING | Skeleton+docs+pin committed 2026-09-20; first CI run FAILED at setup-android (`tools` pkg obsolete) → fixed (manual SDK step, java v5, gradle 9.6.0 pin) + versions re-verified (Kotlin 2.3.21/KSP 2.3.12/AGP 9.4.1, D005) + real MainActivity; awaiting 2nd CI run |
+| P0 | Foundations (skills, agents, env, AGENTS.md, Gradle skeleton, CI) | DOING | D010 pivot: Go dropped, Kotlin-only. AGP9 needs kotlin-android removed (build error msg is explicit) — applied; awaiting CI run |
+| P1 | Engine bridge, Kotlin edition (OkHttp multi-part engine in :engine, FGS, Room/DataStore, 1 HTTP download E2E; torrent client deferred to P4) | TODO | Starts after CI green |
 | P1 | Engine bridge / walking skeleton (AAR, EngineClient, FGS, 1 HTTP + 1 magnet E2E) | TODO | Needs ENGINE_API.md contract first |
 | P2 | Design system + HTTP MVP | TODO | — |
 | P3 | Organization & control | TODO | — |
