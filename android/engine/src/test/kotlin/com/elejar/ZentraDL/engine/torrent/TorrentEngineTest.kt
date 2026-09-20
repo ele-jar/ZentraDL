@@ -29,11 +29,15 @@ class TorrentEngineTest {
         return root
     }
 
-    private fun torrentBytes(root: File): ByteArray = TorrentBuilder()
-        .rootPath(root.toPath())
-        .addFile(File(root, "data").toPath())
-        .pieceSize(1 shl 14)
-        .build()
+    private fun torrentBytes(root: File): ByteArray {
+        val data = File(root, "data")
+        return TorrentBuilder()
+            .rootPath(data.toPath())
+            .addFile(File(data, "a.bin").toPath())
+            .addFile(File(data, "sub/b.bin").toPath())
+            .pieceSize(1 shl 14)
+            .build()
+    }
 
     @Test fun rle_coalescesStates() {
         val complete = BitSet().apply { set(0); set(1); set(4) }
