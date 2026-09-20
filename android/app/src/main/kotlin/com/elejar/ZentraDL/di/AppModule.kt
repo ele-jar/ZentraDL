@@ -46,7 +46,7 @@ object AppModule {
     @Singleton
     fun provideRepository(
         dao: TaskDao,
-        downloader: HttpDownloader,
+        downloader: Downloader,
         settings: SettingsStore,
         appScope: CoroutineScope,
         @ApplicationContext ctx: Context,
