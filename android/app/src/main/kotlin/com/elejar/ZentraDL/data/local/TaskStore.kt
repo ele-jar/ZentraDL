@@ -21,6 +21,12 @@ data class TaskRecord(
     val createdAt: Long,
     /** Last user-facing failure reason (null when never failed / cleared on start). */
     val error: String? = null,
+    /** Category id (see [Category]); "other" when uncategorized. */
+    val categoryId: String = "other",
+    /** True when moved to the private vault (P3e; hidden from the main list). */
+    val vaulted: Boolean = false,
+    /** Expected SHA-256 hex for manual verification (null = not set). */
+    val expectedSha256: String? = null,
 )
 
 @Dao
@@ -51,4 +57,16 @@ interface TaskDao {
 
     @Query("UPDATE tasks SET fileName = :name, totalBytes = :total, destPath = :dest WHERE id = :id")
     suspend fun updateMeta(id: String, name: String, total: Long, dest: String)
+
+    @Query("UPDATE tasks SET categoryId = :categoryId WHERE id = :id")
+    suspend fun updateCategory(id: String, categoryId: String)
+
+    @Query("UPDATE tasks SET categoryId = 'other' WHERE categoryId = :categoryId")
+    suspend fun clearCategory(categoryId: String)
+
+    @Query("UPDATE tasks SET vaulted = :vaulted WHERE id = :id")
+    suspend fun updateVaulted(id: String, vaulted: Boolean)
+
+    @Query("UPDATE tasks SET expectedSha256 = :sha256 WHERE id = :id")
+    suspend fun updateExpectedSha(id: String, sha256: String?)
 }

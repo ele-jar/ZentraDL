@@ -76,6 +76,8 @@ fun DownloadsScreen(
     val header by vm.header.collectAsState()
     val density by vm.density.collectAsState()
     val sort by vm.sort.collectAsState()
+    val categories by vm.categories.collectAsState()
+    val categoryFilter by vm.categoryFilter.collectAsState()
     val ctx = LocalContext.current
     val snacks = remember { SnackbarHostState() }
     var showAdd by remember { mutableStateOf(false) }
@@ -159,6 +161,24 @@ fun DownloadsScreen(
                         label = { Text(f.name) },
                         modifier = Modifier.padding(end = 8.dp),
                     )
+                }
+            }
+            if (categories.isNotEmpty()) {
+                Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+                    FilterChip(
+                        selected = categoryFilter == null,
+                        onClick = { vm.setCategory(null) },
+                        label = { Text(stringResource(R.string.all)) },
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    categories.forEach { c ->
+                        FilterChip(
+                            selected = categoryFilter == c.id,
+                            onClick = { vm.setCategory(if (categoryFilter == c.id) null else c.id) },
+                            label = { Text(c.name) },
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
                 }
             }
             SpeedHeader(header, onPauseAll = { vm.pauseAll() }, onResumeAll = { vm.resumeAll() })

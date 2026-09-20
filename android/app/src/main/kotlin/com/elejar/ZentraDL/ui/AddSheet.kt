@@ -1,11 +1,13 @@
 package com.elejar.ZentraDL.ui
 
 import android.content.Context
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -42,6 +44,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.elejar.ZentraDL.R
+import com.elejar.ZentraDL.domain.Categorizer
 
 /**
  * Add-download sheet (P2b single-URL; batch checklist lands in P3).
@@ -57,11 +60,14 @@ fun AddSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val resolve by vm.resolveState.collectAsState()
     val conns by vm.connections.collectAsState()
+    val categories by vm.categories.collectAsState()
     val ctx = LocalContext.current
     var url by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var nameEdited by remember { mutableStateOf(false) }
     var suggestion by remember { mutableStateOf<String?>(null) }
+    var cat by remember { mutableStateOf<String?>(null) }
+    var catPicked by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         vm.resetResolve()
@@ -72,6 +78,9 @@ fun AddSheet(
     LaunchedEffect(resolve) {
         val info = (resolve as? DownloadsViewModel.ResolveUi.Done)?.info
         if (info != null && !nameEdited) name = info.fileName
+        if (info != null && !catPicked) {
+            cat = Categorizer.categorize(info.fileName, info.mimeType, url).categoryId
+        }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -126,6 +135,23 @@ fun AddSheet(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (categories.isNotEmpty()) {
+                        // Category chip (auto from name/MIME/host); tap to override.
+                        val auto = Categorizer.categorize(
+                            name.ifBlank { r.info.fileName }, r.info.mimeType, url,
+                        ).categoryId
+                        val autoLabel = stringResource(R.string.auto)
+                        Row(Modifier.horizontalScroll(rememberScrollState())) {
+                            categories.forEach { c ->
+                                FilterChip(
+                                    selected = (cat ?: auto) == c.id,
+                                    onClick = { cat = c.id; catPicked = true },
+                                    label = { Text(if (c.id == auto) "${c.name} · $autoLabel" else c.name) },
+                                    modifier = Modifier.padding(end = 8.dp),
+                                )
+                            }
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Connections", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                         IconButton(onClick = { vm.setConnections(conns - 1) }) {
@@ -145,7 +171,7 @@ fun AddSheet(
                     onClick = {
                         val target = url
                         val finalName = name.ifBlank { null }
-                        vm.addDownload(target, finalName) { onStartService(it); onDismiss() }
+                        vm.addDownload(target, finalName, cat) { onStartService(it); onDismiss() }
                     },
                     enabled = ready,
                     modifier = Modifier.weight(1f),
@@ -154,7 +180,7 @@ fun AddSheet(
                     onClick = {
                         val target = url
                         val finalName = name.ifBlank { null }
-                        vm.addDownload(target, finalName) { onDismiss() }
+                        vm.addDownload(target, finalName, cat) { onDismiss() }
                     },
                     enabled = ready,
                     modifier = Modifier.weight(1f),

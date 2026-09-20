@@ -21,6 +21,20 @@ class DownloadsUiTest {
         assertThat(q.filterIsInstance<DownloadsUi.ListItem.Row>().map { it.row.record.id }).containsExactly("b")
     }
 
+    @Test fun categoryFilter() {
+        val records = listOf(
+            rec("a", "completed", "movie.mkv").copy(categoryId = "videos"),
+            rec("b", "completed", "song.mp3").copy(categoryId = "music"),
+        )
+        val videos = DownloadsUi.buildList(
+            records, emptyMap(), "", DownloadsUi.StatusFilter.All, DownloadsUi.SortMode.Date,
+            categoryId = "videos",
+        ).filterIsInstance<DownloadsUi.ListItem.Row>().map { it.row.record.id }
+        assertThat(videos).containsExactly("a")
+        val all = DownloadsUi.buildList(records, emptyMap(), "", DownloadsUi.StatusFilter.All, DownloadsUi.SortMode.Date)
+        assertThat(all.filterIsInstance<DownloadsUi.ListItem.Row>()).hasSize(2)
+    }
+
     @Test fun activeFirstThenDayBuckets() {
         val now = 1_750_000_000_000L
         val records = listOf(

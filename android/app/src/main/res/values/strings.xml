@@ -61,4 +61,11 @@
     <string name="label_link">Link</string>
     <string name="segments_title">Segments</string>
     <string name="segments_row">#%1$d %2$s–%3$s · %4$d%% · %5$d retries</string>
+    <string name="all">All</string>
+    <string name="auto">auto</string>
+    <string name="storage_section">Storage &amp; organization</string>
+    <string name="categories_desc">New downloads are sorted automatically. Deleting a category moves its tasks to Other.</string>
+    <string name="add_category">Add category</string>
+    <string name="category_name">Category name</string>
+    <string name="delete_category">Delete %1$s</string>
 </resources>

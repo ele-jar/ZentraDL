@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -17,6 +19,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,8 +49,10 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val dynamic by vm.dynamicColor.collectAsState()
     val connections by vm.connections.collectAsState()
     val maxRunning by vm.maxRunning.collectAsState()
+    val categories by vm.categories.collectAsState()
     var query by remember { mutableStateOf("") }
     var choice by remember { mutableStateOf<ChoiceState?>(null) }
+    var showAddCat by remember { mutableStateOf(false) }
     val themeTitle = stringResource(R.string.theme)
     val accentTitle = stringResource(R.string.accent)
 
@@ -128,8 +135,49 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
             }
-            if (matches("about", "version", "license")) {
-                item { SectionHeader(stringResource(R.string.about)) }
+            if (matches("storage", "organization", "categor", "folder")) {
+                item { SectionHeader(stringResource(R.string.storage_section)) }
+                item {
+                    Text(
+                        stringResource(R.string.categories_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+                categories.forEach { c ->
+                    item(key = "cat:${c.id}") {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(c.name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    c.folder,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (c.id != "other") {
+                                IconButton(onClick = { vm.deleteCategory(c.id) }) {
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = stringResource(R.string.delete_category, c.name),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                item {
+                    TextButton(onClick = { showAddCat = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Text(stringResource(R.string.add_category))
+                    }
+                }
+            }
+            if (matches("about", "version", "license")) {                item { SectionHeader(stringResource(R.string.about)) }
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text("ZentraDL ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
@@ -164,6 +212,31 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { choice = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    if (showAddCat) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAddCat = false },
+            title = { Text(stringResource(R.string.add_category)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.category_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { vm.addCategory(name); showAddCat = false },
+                    enabled = name.isNotBlank(),
+                ) { Text(stringResource(R.string.add_category)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddCat = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

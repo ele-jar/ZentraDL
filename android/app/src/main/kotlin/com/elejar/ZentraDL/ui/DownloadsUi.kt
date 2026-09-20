@@ -53,11 +53,13 @@ object DownloadsUi {
         filter: StatusFilter,
         sort: SortMode,
         nowMs: Long = System.currentTimeMillis(),
+        categoryId: String? = null,
     ): List<ListItem> {
         val q = query.trim().lowercase()
         val rows = records.mapNotNull { rec ->
             val status = mapStatus(rec.status)
             if (!matchesFilter(status, filter)) return@mapNotNull null
+            if (categoryId != null && rec.categoryId != categoryId) return@mapNotNull null
             if (q.isNotEmpty() && !rec.fileName.lowercase().contains(q) && !rec.url.lowercase().contains(q)) {
                 return@mapNotNull null
             }

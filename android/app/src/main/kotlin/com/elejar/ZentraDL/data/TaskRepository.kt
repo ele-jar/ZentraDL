@@ -1,7 +1,10 @@
 package com.elejar.ZentraDL.data
 
+import com.elejar.ZentraDL.data.local.Category
+import com.elejar.ZentraDL.data.local.CategoryDao
 import com.elejar.ZentraDL.data.local.TaskDao
 import com.elejar.ZentraDL.data.local.TaskRecord
+import com.elejar.ZentraDL.domain.Categorizer
 import com.elejar.ZentraDL.engine.model.DownloadProgress
 import com.elejar.ZentraDL.engine.model.DownloadSpec
 import com.elejar.ZentraDL.engine.model.Downloader
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -39,8 +43,15 @@ class TaskRepository @Inject constructor(
     private val maxRunning: Flow<Int>,
     private val appScope: CoroutineScope,
     val defaultDir: File,
+    private val categoryDao: CategoryDao? = null,
 ) {
     val records: Flow<List<TaskRecord>> = dao.observeAll()
+    val categories: Flow<List<Category>> = categoryDao?.observeAll() ?: flowOf(emptyList())
+
+    init {
+        // Seed built-ins once; IGNORE keeps user edits. Null in unit tests.
+        appScope.launch { categoryDao?.ensureDefaults() }
+    }
 
     fun observe(id: String): Flow<TaskRecord?> = dao.observe(id)
 
@@ -67,18 +78,53 @@ class TaskRepository @Inject constructor(
 
     fun hasRunning(): Boolean = jobs.isNotEmpty()
 
-    suspend fun enqueue(url: String, name: String? = null): String {
+    suspend fun enqueue(url: String, name: String? = null, categoryId: String? = null): String {
         val id = UUID.randomUUID().toString()
         val guess = name?.takeIf { it.isNotBlank() }
             ?: url.substringAfterLast('/').substringBefore('?').ifBlank { "download" }
+        val cat = categoryId ?: Categorizer.categorize(guess, null, url).categoryId
+        val folder = categoryDao?.get(cat)?.folder ?: "Other"
         dao.insert(
             TaskRecord(
                 id = id, url = url, fileName = guess,
-                destPath = defaultDir.absolutePath, status = "queued",
+                destPath = File(defaultDir, folder).absolutePath, status = "queued",
                 totalBytes = -1, createdAt = System.currentTimeMillis(),
+                categoryId = cat,
             ),
         )
         return id
+    }
+
+    suspend fun setCategory(id: String, categoryId: String) {
+        val rec = dao.get(id) ?: return
+        if (rec.status == "completed") {
+            // Keep the file with its category folder when already downloaded.
+            val folder = categoryDao?.get(categoryId)?.folder
+            if (folder != null) {
+                val src = File(rec.destPath, rec.fileName)
+                val destDir = File(defaultDir, folder).apply { mkdirs() }
+                val dest = File(destDir, rec.fileName)
+                if (src.exists() && src.absolutePath != dest.absolutePath) src.renameTo(dest)
+                dao.updateMeta(id, rec.fileName, rec.totalBytes, destDir.absolutePath)
+            }
+        }
+        dao.updateCategory(id, categoryId)
+    }
+
+    suspend fun addCategory(name: String): String {
+        val clean = name.trim().take(32).ifBlank { return "other" }
+        val id = clean.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifBlank { "custom" }
+        val dao = categoryDao ?: return "other"
+        if (dao.get(id) == null) {
+            dao.insert(Category(id, clean, clean, System.currentTimeMillis()))
+        }
+        return id
+    }
+
+    suspend fun deleteCategory(id: String) {
+        if (id == "other") return
+        dao.clearCategory(id)
+        categoryDao?.delete(id)
     }
 
     /** Starts (or joins) the single execution of [id]; waits for a queue slot first. */

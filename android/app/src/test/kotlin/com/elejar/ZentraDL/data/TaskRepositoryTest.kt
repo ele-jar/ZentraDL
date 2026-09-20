@@ -53,6 +53,22 @@ private class FakeDao : TaskDao {
         records[id] = records[id]!!.copy(fileName = name, totalBytes = total, destPath = dest)
         emit()
     }
+    override suspend fun updateCategory(id: String, categoryId: String) {
+        records[id] = records[id]!!.copy(categoryId = categoryId)
+        emit()
+    }
+    override suspend fun clearCategory(categoryId: String) {
+        records.replaceAll { (_, r) -> if (r.categoryId == categoryId) r.copy(categoryId = "other") else r }
+        emit()
+    }
+    override suspend fun updateVaulted(id: String, vaulted: Boolean) {
+        records[id] = records[id]!!.copy(vaulted = vaulted)
+        emit()
+    }
+    override suspend fun updateExpectedSha(id: String, sha256: String?) {
+        records[id] = records[id]!!.copy(expectedSha256 = sha256)
+        emit()
+    }
     private fun emit() {
         flow.value = records.values.sortedByDescending { it.createdAt }
     }

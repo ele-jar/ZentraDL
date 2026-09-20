@@ -2,6 +2,7 @@ package com.elejar.ZentraDL.ui
 
 import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
+import com.elejar.ZentraDL.data.local.Category
 import com.elejar.ZentraDL.data.local.TaskRecord
 import com.elejar.ZentraDL.engine.model.ResourceInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +27,11 @@ class DownloadsViewModel @Inject constructor(
 
     private val query = MutableStateFlow("")
     private val filter = MutableStateFlow(DownloadsUi.StatusFilter.All)
+    private val category = MutableStateFlow<String?>(null)
+
+    val categories: StateFlow<List<Category>> = repo.categories
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val categoryFilter: StateFlow<String?> = category
 
     val density: StateFlow<String> = settings.density
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "comfortable")
@@ -39,9 +45,9 @@ class DownloadsViewModel @Inject constructor(
     val resolveState: StateFlow<ResolveUi> = _resolve
 
     val items: StateFlow<List<DownloadsUi.ListItem>> = combine(
-        repo.records, repo.progress, query, filter, sort,
-    ) { records, progress, q, f, s ->
-        DownloadsUi.buildList(records, progress, q, f, sortOf(s))
+        repo.records, repo.progress, query, filter, sort, category,
+    ) { records, progress, q, f, s, c ->
+        DownloadsUi.buildList(records, progress, q, f, sortOf(s), categoryId = c)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val header: StateFlow<HeaderUi> = combine(repo.records, repo.progress) { records, progress ->
@@ -62,6 +68,14 @@ class DownloadsViewModel @Inject constructor(
 
     fun setFilter(f: DownloadsUi.StatusFilter) {
         filter.value = f
+    }
+
+    fun setCategory(id: String?) {
+        category.value = id
+    }
+
+    fun moveToCategory(id: String, categoryId: String) {
+        viewModelScope.launch { repo.setCategory(id, categoryId) }
     }
 
     fun setSort(s: DownloadsUi.SortMode) {
@@ -93,7 +107,7 @@ class DownloadsViewModel @Inject constructor(
         _resolve.value = ResolveUi.Idle
     }
 
-    fun addDownload(url: String, name: String? = null, onEnqueued: (String) -> Unit) {
+    fun addDownload(url: String, name: String? = null, categoryId: String? = null, onEnqueued: (String) -> Unit) {
         viewModelScope.launch {
             val clean = url.trim()
             if (clean.isBlank()) {
@@ -101,7 +115,7 @@ class DownloadsViewModel @Inject constructor(
                 return@launch
             }
             try {
-                onEnqueued(repo.enqueue(clean, name))
+                onEnqueued(repo.enqueue(clean, name, categoryId))
             } catch (e: Exception) {
                 _events.send(Event.Message("Couldn't add download: ${e.message}"))
             }
