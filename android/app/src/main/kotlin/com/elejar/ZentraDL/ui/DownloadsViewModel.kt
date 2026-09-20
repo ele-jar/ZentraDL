@@ -46,9 +46,10 @@ class DownloadsViewModel @Inject constructor(
 
     val items: StateFlow<List<DownloadsUi.ListItem>> = combine(
         repo.records, repo.progress, query, filter, sort, category,
-    ) { records, progress, q, f, s, c ->
-        DownloadsUi.buildList(records, progress, q, f, sortOf(s), categoryId = c)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        transform = { records, progress, q, f, s, c ->
+            DownloadsUi.buildList(records, progress, q, f, sortOf(s), categoryId = c)
+        },
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val header: StateFlow<HeaderUi> = combine(repo.records, repo.progress) { records, progress ->
         val down = progress.values.sumOf { it.bytesPerSecond }
