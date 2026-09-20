@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.bt.core)
     implementation(libs.bt.http.tracker)
     implementation(libs.bt.dht)
+    implementation(libs.guava) // pin: Guice needs collect.Streams at runtime
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.timber)

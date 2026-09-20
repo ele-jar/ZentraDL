@@ -6,3 +6,9 @@
 -keep class bt.** { *; }
 -keep class com.google.inject.** { *; }
 -keepattributes *Annotation*, Signature, EnclosingMethod, InnerClasses
+# bt transitives reference desktop-only APIs on dead paths (snakeyaml beans,
+# httpclient javax.naming fallback, slf4j NOP binding) — never loaded on device.
+-dontwarn java.beans.**
+-dontwarn javax.naming.**
+-dontwarn org.slf4j.impl.**
+-dontwarn java.lang.reflect.AnnotatedType
