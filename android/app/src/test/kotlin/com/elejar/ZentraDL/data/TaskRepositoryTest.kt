@@ -97,7 +97,9 @@ class TaskRepositoryTest {
 
     @Test fun cancel_marksPaused(): Unit = runBlocking {
         val dao = FakeDao()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        // Unconfined: the download body runs deterministically on this thread up to
+        // the hanging collect; no pool thread can starve or reorder the sequence.
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val hanging = FakeDownloader(ResourceInfo("https://x/f", "f", 100, null, true))
         val r = repo(hanging, dao, scope)
         val id = r.enqueue("https://x/f")

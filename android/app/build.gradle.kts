@@ -32,6 +32,11 @@ android {
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
     packaging { jniLibs { useLegacyPackaging = false } } // 16 KB page alignment via NDK r28+
 }
+tasks.withType<org.gradle.api.tasks.testing.Test> {
+    testLogging {
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}
 dependencies {
     implementation(project(":android:engine"))
     implementation(project(":android:designsystem"))
