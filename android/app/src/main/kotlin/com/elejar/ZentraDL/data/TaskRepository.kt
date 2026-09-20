@@ -38,7 +38,7 @@ class TaskRepository @Inject constructor(
     private val connections: Flow<Int>,
     private val maxRunning: Flow<Int>,
     private val appScope: CoroutineScope,
-    private val defaultDir: File,
+    val defaultDir: File,
 ) {
     val records: Flow<List<TaskRecord>> = dao.observeAll()
 

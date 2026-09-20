@@ -3,6 +3,7 @@ package com.elejar.ZentraDL.ui
 import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.local.TaskRecord
+import com.elejar.ZentraDL.engine.model.ResourceInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
@@ -30,6 +31,12 @@ class DownloadsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "comfortable")
     val sort: StateFlow<String> = settings.sort
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "date")
+    val connections: StateFlow<Int> = settings.connections
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 8)
+    val defaultDirPath: String get() = repo.defaultDir.absolutePath
+
+    private val _resolve = MutableStateFlow<ResolveUi>(ResolveUi.Idle)
+    val resolveState: StateFlow<ResolveUi> = _resolve
 
     val items: StateFlow<List<DownloadsUi.ListItem>> = combine(
         repo.records, repo.progress, query, filter, sort,
@@ -63,6 +70,27 @@ class DownloadsViewModel @Inject constructor(
 
     fun setDensity(d: String) {
         viewModelScope.launch { settings.setDensity(d) }
+    }
+
+    fun setConnections(n: Int) {
+        viewModelScope.launch { settings.setConnections(n) }
+    }
+
+    fun resolve(url: String) {
+        viewModelScope.launch {
+            val clean = url.trim()
+            if (clean.isBlank()) return@launch
+            _resolve.value = ResolveUi.Resolving
+            _resolve.value = try {
+                ResolveUi.Done(repo.probe(clean))
+            } catch (e: Exception) {
+                ResolveUi.Error(e.message ?: "Couldn't check this link")
+            }
+        }
+    }
+
+    fun resetResolve() {
+        _resolve.value = ResolveUi.Idle
     }
 
     fun addDownload(url: String, name: String? = null, onEnqueued: (String) -> Unit) {
@@ -108,6 +136,10 @@ class DownloadsViewModel @Inject constructor(
         viewModelScope.launch { repo.pauseAll() }
     }
 
+    fun message(text: String) {
+        viewModelScope.launch { _events.send(Event.Message(text)) }
+    }
+
     fun resumeAll() {
         viewModelScope.launch { repo.resumeAll() }
     }
@@ -125,6 +157,13 @@ class DownloadsViewModel @Inject constructor(
     }
 
     data class HeaderUi(val downSpeed: Long, val active: Int, val queued: Int)
+
+    sealed interface ResolveUi {
+        data object Idle : ResolveUi
+        data object Resolving : ResolveUi
+        data class Done(val info: ResourceInfo) : ResolveUi
+        data class Error(val message: String) : ResolveUi
+    }
 
     sealed interface Event {
         data class Message(val text: String) : Event

@@ -7,4 +7,23 @@
     <string name="stop_all">Stop all</string>
     <string name="starting">Starting…</string>
     <string name="empty_hint">No downloads yet — paste a link above to start.</string>
+    <string name="empty_title">No downloads here</string>
+    <string name="search_downloads">Search downloads</string>
+    <string name="sort">Sort</string>
+    <string name="toggle_density">Toggle density (now %1$s)</string>
+    <string name="add_download">Add download</string>
+    <string name="copy_link">Copy link</string>
+    <string name="retry">Retry</string>
+    <string name="delete">Delete</string>
+    <string name="delete_with_file">Delete with file</string>
+    <string name="delete_file_title">Delete file too?</string>
+    <string name="delete_file_text">%1$s will be removed from storage. This can\'t be undone.</string>
+    <string name="cancel">Cancel</string>
+    <string name="more_actions">More actions for %1$s</string>
+    <string name="pause_all">Pause all</string>
+    <string name="resume_all">Resume all</string>
+    <string name="url_label">Link</string>
+    <string name="name_label">Name</string>
+    <string name="check">Check</string>
+    <string name="queue_action">Queue</string>
 </resources>
