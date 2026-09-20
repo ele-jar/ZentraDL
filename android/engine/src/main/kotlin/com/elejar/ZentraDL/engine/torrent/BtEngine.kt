@@ -44,6 +44,8 @@ data class BtOptions(
     val maxPeersPerTorrent: Int = 50,
     val hashingThreads: Int = 1,
     val enableDht: Boolean = true,
+    /** Re-dial interval for dropped peers (bt default 5 min — too desktop for phones). */
+    val peerRetrySeconds: Long = 60,
 )
 
 /**
@@ -73,6 +75,7 @@ class BtEngine(
         if (opts.bindHost != null) config.acceptorAddress = java.net.InetAddress.getByName(opts.bindHost)
         config.maxPeerConnectionsPerTorrent = opts.maxPeersPerTorrent
         config.numOfHashingThreads = opts.hashingThreads
+        config.peerConnectionRetryInterval = java.time.Duration.ofSeconds(opts.peerRetrySeconds)
         val builder = BtRuntime.builder(config)
             .disableLocalServiceDiscovery()
             .disableAutomaticShutdown()

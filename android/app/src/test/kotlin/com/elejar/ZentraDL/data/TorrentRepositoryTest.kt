@@ -109,7 +109,9 @@ class TorrentRepositoryTest {
                 .pieceSize(1 shl 14).build()
 
             val seedPort = freePort()
-            val seeder = BtEngine(BtOptions(acceptorPort = seedPort, bindHost = "127.0.0.1", enableDht = false))
+            val seeder = BtEngine(
+                BtOptions(acceptorPort = seedPort, bindHost = "127.0.0.1", enableDht = false, peerRetrySeconds = 5),
+            )
             seeder.start()
             val seedSession = seeder.download(TorrentDownloadSpec(null, bytes, root))
             // Seeder must verify + seed before anyone leeches (isolates seeder-side stalls).
@@ -125,7 +127,10 @@ class TorrentRepositoryTest {
             }
 
             val engine = BtEngine(
-                BtOptions(acceptorPort = freePort(), bindHost = "127.0.0.1", enableDht = false),
+                BtOptions(
+                    acceptorPort = freePort(), bindHost = "127.0.0.1",
+                    enableDht = false, peerRetrySeconds = 5,
+                ),
             )
             val dao = FakeTaskDao()
             val trepo = TorrentRepository(dao, FakeTorrentDao(), FakeCategoryDao(), engine, scope, filesDir)
