@@ -58,7 +58,7 @@ private class FakeDao : TaskDao {
         emit()
     }
     override suspend fun clearCategory(categoryId: String) {
-        records.replaceAll { (_, r) -> if (r.categoryId == categoryId) r.copy(categoryId = "other") else r }
+        records.replaceAll { _, r -> if (r.categoryId == categoryId) r.copy(categoryId = "other") else r }
         emit()
     }
     override suspend fun updateVaulted(id: String, vaulted: Boolean) {
