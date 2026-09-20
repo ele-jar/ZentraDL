@@ -86,9 +86,14 @@ class TorrentEngineTest {
             assertThat(fetched.rawBytes).isNotNull()
 
             val dest = Files.createTempDirectory("leech").toFile()
-            val session = leecher.download(TorrentDownloadSpec(magnet, fetched.rawBytes, dest))
+            val session = leecher.download(
+                TorrentDownloadSpec(magnet, fetched.rawBytes, dest, pieceLength = fetched.meta.pieceLength),
+            )
             withTimeout(120_000) {
-                while (session.stats.value.state != TorrentRunState.SEEDING) delay(500)
+                while (session.stats.value.state != TorrentRunState.SEEDING) {
+                    session.error.value?.let { throw IllegalStateException("session failed: $it") }
+                    delay(500)
+                }
             }
             val map = session.pieceMap()
             assertThat(map).isNotNull()

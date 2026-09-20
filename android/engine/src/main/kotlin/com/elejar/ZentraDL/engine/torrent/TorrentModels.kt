@@ -37,12 +37,14 @@ data class FetchedMeta(val meta: TorrentMeta, val rawBytes: ByteArray?)
 /** What to download. */
 data class TorrentDownloadSpec(
     val magnet: String?,
-    /** Raw .torrent bytes (preferred over magnet when present). */
+    /** Raw .torrent bytes (used only when no magnet is known). */
     val torrentBytes: ByteArray?,
     val saveDir: File,
     /** Subset of file paths (as in [TorrentFileMeta.path]); null = all. */
     val selectedPaths: Set<String>? = null,
     val sequential: Boolean = false,
+    /** Known piece length (from the add-flow metadata); -1 = unknown yet. */
+    val pieceLength: Long = -1,
 )
 
 /** Live counters for one session. Rates are sampled by the wrapper. */

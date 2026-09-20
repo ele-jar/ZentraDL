@@ -131,11 +131,13 @@ class BtEngine(
     fun download(spec: TorrentDownloadSpec): BtSession {
         val rt = runtime ?: throw IllegalStateException("BtEngine not started")
         val builder = Bt.client(rt).storage(FileSystemStorage(spec.saveDir))
-        if (spec.torrentBytes != null) {
-            val bytes = spec.torrentBytes
-            builder.torrent { metaService.fromByteArray(bytes) }
+        // Magnet first: it carries x.pe peer hints, which the bare-bytes path would lose.
+        // Bytes are only the source when no magnet is known (pure .torrent adds).
+        if (spec.magnet != null) {
+            builder.magnet(spec.magnet)
         } else {
-            builder.magnet(requireNotNull(spec.magnet) { "magnet or torrentBytes required" })
+            val bytes = requireNotNull(spec.torrentBytes) { "magnet or torrentBytes required" }
+            builder.torrent { metaService.fromByteArray(bytes) }
         }
         if (spec.sequential) builder.sequentialSelector()
         val wanted = spec.selectedPaths
@@ -145,9 +147,11 @@ class BtEngine(
             }
         }
         val client = builder.build()
-        val idHex = spec.torrentBytes?.let { toMeta(metaService.fromByteArray(it), spec.magnet).idHex }
-            ?: parseMagnet(requireNotNull(spec.magnet)).idHex
-        val pieceLength = spec.torrentBytes?.let { metaService.fromByteArray(it).chunkSize } ?: -1L
+        val idHex = spec.magnet?.let { parseMagnet(it).idHex }
+            ?: spec.torrentBytes?.let { toMeta(metaService.fromByteArray(it), null).idHex }
+            ?: throw IllegalArgumentException("magnet or torrentBytes required")
+        val pieceLength = spec.torrentBytes?.let { metaService.fromByteArray(it).chunkSize }
+            ?: spec.pieceLength
         return BtSession(rt, client, idHex, pieceLength)
     }
 
