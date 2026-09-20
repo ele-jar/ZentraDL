@@ -5,8 +5,8 @@
 
 | ID | Name | Status | Notes |
 |---|---|---|---|
-| P0 | Foundations (skills, agents, env, AGENTS.md, Gradle skeleton, CI) | DOING | D010 pivot: Go dropped, Kotlin-only. AGP9 needs kotlin-android removed (build error msg is explicit) — applied; awaiting CI run |
-| P1 | Engine bridge, Kotlin edition (OkHttp multi-part engine in :engine, FGS, Room/DataStore, 1 HTTP download E2E; torrent client deferred to P4) | TODO | Starts after CI green |
+| P0 | Foundations (skills, agents, env, AGENTS.md, Gradle skeleton, CI) | DONE | CI green 2026-09-20 (D010 Kotlin-only pivot; D011 sdk37.2) |
+| P1 | Engine bridge, Kotlin edition (OkHttp engine, Room/DataStore/Hilt, FGS, skeleton screen, E2E) | DONE | CI green 2026-09-20: 17 tests (MockWebServer range/resume/fallback, repo lifecycle), debug+release APKs |
 | P1 | Engine bridge / walking skeleton (AAR, EngineClient, FGS, 1 HTTP + 1 magnet E2E) | TODO | Needs ENGINE_API.md contract first |
 | P2 | Design system + HTTP MVP | TODO | — |
 | P3 | Organization & control | TODO | — |
