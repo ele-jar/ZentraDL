@@ -172,6 +172,17 @@
     <string name="paste_rules">Paste rule text</string>
     <string name="imported_n">Imported %1$d rules.</string>
     <string name="no_rules">No rules yet.</string>
+    <string name="skip">Skip</string>
+    <string name="next">Next</string>
+    <string name="done">Done</string>
+    <string name="ob1_title">Downloads, minus the hassle</string>
+    <string name="ob1_text">Fast multi-connection downloads, torrents, and a browser that sniffs media — no ads, no tracking.</string>
+    <string name="ob2_title">Make it yours</string>
+    <string name="ob2_text">Pick a theme. Everything else already has calm defaults.</string>
+    <string name="ob3_title">A little automation?</string>
+    <string name="ob3_text">Rules can sort finished downloads into folders. Off until you add one — this switch is the master.</string>
+    <string name="check_updates">Check for updates</string>
+    <string name="tile_label">Pause downloads</string>
     <string name="storage_overview">%1$s free · %2$s in downloads</string>
     <string name="clear_history_btn">Clear history</string>
     <string name="delete_failed_btn">Delete failed files</string>

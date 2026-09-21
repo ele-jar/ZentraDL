@@ -387,6 +387,8 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             if (matches("about", "version", "license")) {
                 item { SectionHeader(stringResource(R.string.about)) }
                 item {
+                    var updateMsg by remember { mutableStateOf<String?>(null) }
+                    var checking by remember { mutableStateOf(false) }
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text("ZentraDL ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
                         Text(
@@ -394,6 +396,24 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        TextButton(
+                            onClick = {
+                                checking = true
+                                updateMsg = null
+                                vm.checkUpdate {
+                                    updateMsg = it
+                                    checking = false
+                                }
+                            },
+                            enabled = !checking,
+                        ) { Text(stringResource(R.string.check_updates)) }
+                        updateMsg?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }

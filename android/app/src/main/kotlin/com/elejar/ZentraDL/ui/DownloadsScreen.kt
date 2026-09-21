@@ -86,6 +86,7 @@ fun DownloadsScreen(
     onDetails: (String) -> Unit,
     onTorrentDetails: (String) -> Unit,
     pendingUrl: String? = null,
+    forceAdd: Boolean = false,
     vm: DownloadsViewModel = hiltViewModel(),
 ) {
     val items by vm.items.collectAsState()
@@ -100,7 +101,7 @@ fun DownloadsScreen(
     val isTorrentLink = pendingUrl?.let {
         it.startsWith("magnet:") || it.substringBefore('?').endsWith(".torrent", ignoreCase = true)
     } == true
-    var showAdd by remember(pendingUrl) { mutableStateOf(pendingUrl != null && !isTorrentLink) }
+    var showAdd by remember(pendingUrl) { mutableStateOf((pendingUrl != null && !isTorrentLink) || forceAdd) }
     var showTorrentAdd by remember(pendingUrl) { mutableStateOf(isTorrentLink) }
     var sortOpen by remember { mutableStateOf(false) }
     var confirmDeleteFile by remember { mutableStateOf<TaskRecord?>(null) }

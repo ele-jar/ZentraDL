@@ -38,10 +38,16 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    companion object {
+        const val ACTION_ADD = "com.elejar.ZentraDL.action.ADD"
+        const val EXTRA_OPEN_ADD = "open_add"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val pending = extractShareUrl(intent)
+        val openAdd = intent?.action == ACTION_ADD || intent?.getBooleanExtra(EXTRA_OPEN_ADD, false) == true
         setContent {
             // Theme comes from Settings (v1 in P2c); defaults keep first-run calm.
             val settingsVm: SettingsViewModel = hiltViewModel()
@@ -53,7 +59,7 @@ class MainActivity : ComponentActivity() {
                 accent = runCatching { Accent.valueOf(accent) }.getOrDefault(Accent.Blue),
                 dynamic = dynamic,
             ) {
-                GatedNav(pendingUrl = pending)
+                GatedNav(pendingUrl = pending, openAdd = openAdd)
             }
         }
     }
@@ -79,7 +85,7 @@ class MainActivity : ComponentActivity() {
  * enrolled → treat as unlocked (nothing to check against).
  */
 @Composable
-private fun GatedNav(pendingUrl: String?, settingsVm: SettingsViewModel = hiltViewModel()) {
+private fun GatedNav(pendingUrl: String?, openAdd: Boolean, settingsVm: SettingsViewModel = hiltViewModel()) {
     val ctx = LocalContext.current
     val appLock by settingsVm.appLock.collectAsState()
     var unlocked by remember { mutableStateOf(false) }
@@ -111,7 +117,7 @@ private fun GatedNav(pendingUrl: String?, settingsVm: SettingsViewModel = hiltVi
         if (appLock && !unlocked) prompt()
     }
     if (unlocked || !appLock) {
-        AppNav(pendingUrl = pendingUrl)
+        AppNav(pendingUrl = pendingUrl, openAdd = openAdd)
     } else {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()

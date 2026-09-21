@@ -35,6 +35,15 @@ class DownloadsUiTest {
         assertThat(all.filterIsInstance<DownloadsUi.ListItem.Row>()).hasSize(2)
     }
 
+    @Test fun tenThousandRows_buildFast() {
+        val records = (0 until 10_000).map { rec("id$it", "completed", "file$it.bin", created = it.toLong()) }
+        val start = System.currentTimeMillis()
+        val items = DownloadsUi.buildList(records, emptyMap(), "", DownloadsUi.StatusFilter.All, DownloadsUi.SortMode.Date)
+        val took = System.currentTimeMillis() - start
+        assertThat(items.filterIsInstance<DownloadsUi.ListItem.Row>()).hasSize(10_000)
+        assertThat(took).isLessThan(5_000)
+    }
+
     @Test fun vaultHiddenExceptUnderVaultFilter() {
         val records = listOf(
             rec("a", "completed"),

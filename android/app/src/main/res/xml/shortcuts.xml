@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="add"
+        android:enabled="true"
+        android:icon="@drawable/ic_pause_all"
+        android:shortcutShortLabel="@string/add_download"
+        android:shortcutLongLabel="@string/add_download">
+        <intent
+            android:action="com.elejar.ZentraDL.action.ADD"
+            android:targetPackage="com.elejar.ZentraDL"
+            android:targetClass="com.elejar.ZentraDL.MainActivity" />
+    </shortcut>
+</shortcuts>

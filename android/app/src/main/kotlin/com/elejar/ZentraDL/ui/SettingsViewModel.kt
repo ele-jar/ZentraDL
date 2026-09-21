@@ -120,6 +120,41 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setSmartMaster(v) }
     }
 
+    val onboarded: StateFlow<Boolean> = settings.onboarded
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setOnboarded(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            settings.setOnboarded()
+            onDone()
+        }
+    }
+
+    /** User-triggered update check (off by default; X5). Result line via callback. */
+    fun checkUpdate(onResult: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            onResult(
+                try {
+                    val req = okhttp3.Request.Builder()
+                        .url("https://api.github.com/repos/ele-jar/ZentraDL/releases/latest")
+                        .header("Accept", "application/vnd.github+json")
+                        .build()
+                    com.elejar.ZentraDL.engine.http.defaultHttpClient().newCall(req).execute().use { resp ->
+                        if (!resp.isSuccessful) return@use "Check failed (HTTP ${resp.code})"
+                        val body = resp.body.string()
+                        val tag = Regex(""""tag_name"\s*:\s*"([^"]+)"""").find(body)?.groupValues?.get(1)
+                            ?: return@use "No releases yet"
+                        val current = com.elejar.ZentraDL.BuildConfig.VERSION_NAME
+                        if (tag.trimStart('v') == current) "You're on the latest ($current)"
+                        else "Update available: $tag (you have $current)"
+                    }
+                } catch (e: Exception) {
+                    "Check failed: ${e.message}"
+                },
+            )
+        }
+    }
+
     private val _ruleList = MutableStateFlow(emptyList<Rule>())
     val ruleList: StateFlow<List<Rule>> = _ruleList.asStateFlow()
 

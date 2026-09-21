@@ -38,6 +38,7 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     private val seedGoalKey = intPreferencesKey("seed_goal_ratio")
     private val adblockKey = booleanPreferencesKey("adblock_enabled")
     private val smartMasterKey = booleanPreferencesKey("smart_master")
+    private val onboardedKey = booleanPreferencesKey("onboarded")
     private val quietEnabledKey = booleanPreferencesKey("quiet_enabled")
     private val quietStartKey = intPreferencesKey("quiet_start_min")
     private val quietEndKey = intPreferencesKey("quiet_end_min")
@@ -65,6 +66,7 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     val seedGoal: Flow<Int> = ctx.prefs.data.map { it[seedGoalKey] ?: 0 }
     val adblock: Flow<Boolean> = ctx.prefs.data.map { it[adblockKey] ?: true }
     val smartMaster: Flow<Boolean> = ctx.prefs.data.map { it[smartMasterKey] ?: true }
+    val onboarded: Flow<Boolean> = ctx.prefs.data.map { it[onboardedKey] ?: false }
     val quietEnabled: Flow<Boolean> = ctx.prefs.data.map { it[quietEnabledKey] ?: false }
     val quietStartMin: Flow<Int> = ctx.prefs.data.map { it[quietStartKey] ?: 1320 }
     val quietEndMin: Flow<Int> = ctx.prefs.data.map { it[quietEndKey] ?: 420 }
@@ -153,6 +155,10 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
 
     suspend fun setSmartMaster(v: Boolean) {
         ctx.prefs.edit { it[smartMasterKey] = v }
+    }
+
+    suspend fun setOnboarded() {
+        ctx.prefs.edit { it[onboardedKey] = true }
     }
 
     suspend fun setQuietEnabled(v: Boolean) {

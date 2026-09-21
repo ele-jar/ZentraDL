@@ -12,9 +12,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -38,12 +40,17 @@ object Browser
 object Activity
 
 @Serializable
+object Onboarding
+
+@Serializable
 object Settings
 
-/** App navigation (P6b: + Activity; full nav per U2). */
+/** App navigation (P7a: + Onboarding first-run). */
 @Composable
-fun AppNav(pendingUrl: String? = null) {
+fun AppNav(pendingUrl: String? = null, openAdd: Boolean = false) {
     val nav = rememberNavController()
+    val settingsVm: SettingsViewModel = hiltViewModel()
+    val onboarded by settingsVm.onboarded.collectAsState()
     val entry by nav.currentBackStackEntryAsState()
     // Bottom bar on top-level destinations only.
     val topRoute = entry?.destination?.route
@@ -81,12 +88,24 @@ fun AppNav(pendingUrl: String? = null) {
             }
         },
     ) { pads ->
-        NavHost(navController = nav, startDestination = Downloads, modifier = Modifier.padding(pads)) {
+        NavHost(
+            navController = nav,
+            startDestination = if (onboarded) Downloads else Onboarding,
+            modifier = Modifier.padding(pads),
+        ) {
+            composable<Onboarding> {
+                OnboardingScreen(onDone = {
+                    nav.navigate(Downloads) {
+                        popUpTo(Onboarding) { inclusive = true }
+                    }
+                })
+            }
             composable<Downloads> {
                 DownloadsScreen(
                     onDetails = { id -> nav.navigate(Details(id)) },
                     onTorrentDetails = { id -> nav.navigate(TorrentDetails(id)) },
                     pendingUrl = pendingUrl,
+                    forceAdd = openAdd,
                 )
             }
             composable<Browser> {
