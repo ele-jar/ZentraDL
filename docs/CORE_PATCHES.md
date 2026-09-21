@@ -1,18 +1,18 @@
-# CORE_PATCHES.md — our Go changes on Gopeed v1.9.3 (keep upstream-mergeable)
+# CORE_PATCHES.md — engine deltas (D010: Go core dropped, history below)
 
-> Every patch: new files only + Go tests + this entry (why). Status in PROGRESS.md.
+> The Gopeed Go core (`core/` submodule) was removed per user instruction
+> (D010, 2026-09-20). The CP1–CP10 Go-patch table is void; this file now tracks
+> the equivalent Kotlin-engine deltas in `:engine`.
 
-| # | Patch | Why (§5) | Status |
+| # | Delta | Why (§5) | Status |
 |---|---|---|---|
-| CP1 | HTTP `StatsConnection` += ranges + per-conn speed | PM3 Segments map | TODO (Phase 2) |
-| CP2 | Resume validators (ETag/Last-Modified/size) + checksum verify | H2/H9 | TODO (Phase 3) |
-| CP3 | Retry modes + exp-backoff/jitter; per-host caps + memory | H3/Q2/S7 | TODO (Phase 3) |
-| CP4 | Piece-detail RLE endpoint (`pieces=` flags, down-sample) | PM1 | TODO (Phase 4) |
-| CP5 | Tracker CRUD + re-announce + per-tracker stats; peer ban hook | T3/T4 | TODO (Phase 4) |
-| CP6 | Per-file priority post-create via PATCH | T2 | TODO (Phase 4) |
-| CP7 | Sequential / first-last-piece streaming mode | T7 | TODO (Phase 4) |
-| CP8 | Per-task speed limits; per-torrent seed-goal override; net toggles + port | Q2/T5 | TODO (Phase 4) |
-| CP9 | HLS (AES-128 non-DRM) + DASH fetcher + merge | H13 | TODO (Phase 5) |
-| CP10 | Mirrors/fallback + checksum validation | H7 | TODO (Phase 3) |
+| K1 | OkHttp multi-part HTTP (1–32 conns, resume, 3x retry, 4 Hz, seg trackers) | H1–H4 | DONE (P1/P2) |
+| K2 | Global token-bucket speed cap (`SpeedLimiter`) | Q2 | DONE (P3d; HTTP only — bt has no caps API) |
+| K3 | Free-space preflight before first byte | H11 | DONE (P6c; HTTP only) |
+| K4 | HLS variant picker + AES-128 TS fetcher | H13 | DONE (P5b; DASH merge = gap) |
+| K5 | bt 1.10 wrapper: isolated runtimes, file selection, sequential, RLE pieces | T1–T7/PM1 | DONE (P4; see `docs/BT_API.md`) |
+| K6 | Refresh-link in place (re-queue, partial kept) | H5 | DONE (P5c) |
+| K7 | SHA-256 verify card for completed files | H9-lite | DONE (P3c; no sibling auto-detect) |
 
-Go: `cd core/upstream && go vet ./... && go test ./...`. Build: `scripts/build-core.sh`.
+Deferred core work (see `docs/GAPS.md`): mirrors/fallback URLs, ETag validators,
+per-host backoff memory, DASH merge, per-torrent rate caps, FTP/SFTP.
