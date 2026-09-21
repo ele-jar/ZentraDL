@@ -23,6 +23,7 @@
 | `dht_enabled` | Torrents | on | DHT peer discovery (new sessions) |
 | `max_peers` | Torrents | 50 | Peers per torrent 5–200 (new sessions) |
 | `seed_goal` | Torrents | 0 (forever) | Stop seeding at ratio ×100 |
+| `adblock_enabled` | Browser | on | Host-list ad/tracker blocking |
 | (categories) | Storage & organization | 7 built-ins | Room table; per-category folders; add/delete in Settings |
 
 > Reset-per-section, Torrent/Browser/Notifications/Smart groups, backup/restore: later phases.

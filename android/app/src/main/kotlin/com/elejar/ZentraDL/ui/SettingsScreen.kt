@@ -66,6 +66,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val dhtEnabled by vm.dhtEnabled.collectAsState()
     val maxPeers by vm.maxPeers.collectAsState()
     val seedGoal by vm.seedGoal.collectAsState()
+    val adblock by vm.adblock.collectAsState()
     val themeTitle = stringResource(R.string.theme)
     val accentTitle = stringResource(R.string.accent)
 
@@ -286,13 +287,25 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
             }
-            if (matches("privacy", "security", "lock", "vault")) {                item { SectionHeader(stringResource(R.string.privacy_section)) }
+            if (matches("privacy", "security", "lock", "vault")) {
+                item { SectionHeader(stringResource(R.string.privacy_section)) }
                 item {
                     SwitchRow(
                         title = stringResource(R.string.app_lock),
                         description = stringResource(R.string.app_lock_desc),
                         checked = appLock,
                         onCheckedChange = { vm.setAppLock(it) },
+                    )
+                }
+            }
+            if (matches("browser", "ads", "block")) {
+                item { SectionHeader(stringResource(R.string.browser_section)) }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.block_ads),
+                        description = stringResource(R.string.block_ads_desc),
+                        checked = adblock,
+                        onCheckedChange = { vm.setAdblock(it) },
                     )
                 }
             }

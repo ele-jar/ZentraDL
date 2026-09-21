@@ -98,6 +98,7 @@ private const val JS_COLLECT =
 fun BrowserScreen(
     vm: BrowserViewModel = hiltViewModel(),
     dlVm: DownloadsViewModel = hiltViewModel(),
+    initialUrl: String = "",
 ) {
     val tabs by vm.tabs.collectAsState()
     val selected by vm.selected.collectAsState()
@@ -114,6 +115,11 @@ fun BrowserScreen(
     var showAdd by remember { mutableStateOf(false) }
     var bookmarked by remember { mutableStateOf(false) }
     val tab = tabs.firstOrNull { it.id == selected }
+
+    // Shared playlist links open straight in the browser (sniffer takes it from here).
+    LaunchedEffect(initialUrl) {
+        if (initialUrl.isNotBlank()) vm.go(initialUrl)
+    }
 
     LaunchedEffect(tab?.url) {
         address = tab?.url.orEmpty()

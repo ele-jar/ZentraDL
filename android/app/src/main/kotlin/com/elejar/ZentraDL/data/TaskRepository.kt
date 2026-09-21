@@ -190,6 +190,19 @@ class TaskRepository @Inject constructor(
         }
     }
 
+    /** Refresh an expired link in place (H5): new URL, re-queued, partial kept for resume. */
+    suspend fun refreshUrl(id: String, url: String): Boolean {
+        val clean = url.trim()
+        if (clean.isBlank() || jobs.containsKey(id)) return false
+        val rec = dao.get(id) ?: return false
+        if (rec.kind != "http") return false
+        dao.updateUrl(id, clean, "")
+        dao.updateMeta(id, rec.fileName, -1, rec.destPath)
+        dao.updateError(id, null)
+        dao.updateStatus(id, "queued")
+        return true
+    }
+
     suspend fun rename(id: String, newName: String): Boolean {
         val clean = newName.trim()
         if (clean.isBlank() || clean.contains('/') || clean.contains('\\') || clean == "." || clean == "..") {

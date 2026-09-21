@@ -50,6 +50,8 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 50)
     val seedGoal: StateFlow<Int> = settings.seedGoal
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    val adblock: StateFlow<Boolean> = settings.adblock
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     fun setAppLock(v: Boolean) {
         viewModelScope.launch { settings.setAppLock(v) }
@@ -65,6 +67,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setSeedGoal(v: Int) {
         viewModelScope.launch { settings.setSeedGoal(v) }
+    }
+
+    fun setAdblock(v: Boolean) {
+        viewModelScope.launch { settings.setAdblock(v) }
     }
 
     fun setWifiOnly(v: Boolean) {

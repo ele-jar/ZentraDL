@@ -80,7 +80,12 @@ fun AppNav(pendingUrl: String? = null) {
                 )
             }
             composable<Browser> {
-                BrowserScreen()
+                // Playlist links skip Downloads and land in the browser for sniffing.
+                val isPlaylist = pendingUrl?.substringBefore('?')
+                    ?.endsWith(".m3u8", ignoreCase = true) == true ||
+                    pendingUrl?.substringBefore('?')
+                        ?.endsWith(".mpd", ignoreCase = true) == true
+                BrowserScreen(initialUrl = if (isPlaylist) pendingUrl ?: "" else "")
             }
             composable<Details> {
                 DetailsScreen(onBack = { nav.popBackStack() }, onDeleted = { nav.popBackStack() })

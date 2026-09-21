@@ -89,6 +89,12 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
+    fun refreshLink(url: String) {
+        viewModelScope.launch {
+            _events.send(if (repo.refreshUrl(args.id, url)) "Link updated — queued" else "Couldn't update now")
+        }
+    }
+
     fun message(text: String) {
         viewModelScope.launch { _events.send(text) }
     }

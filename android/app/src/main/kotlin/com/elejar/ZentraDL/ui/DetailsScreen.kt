@@ -76,6 +76,7 @@ fun DetailsScreen(
     val snacks = remember { SnackbarHostState() }
     var menu by remember { mutableStateOf(false) }
     var confirmDeleteFile by remember { mutableStateOf(false) }
+    var refreshLink by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
     var move by remember { mutableStateOf(false) }
     val noFileText = stringResource(R.string.no_file)
@@ -107,6 +108,10 @@ fun DetailsScreen(
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.more_actions_simple))
                     }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.refresh_link)) },
+                            onClick = { menu = false; refreshLink = true },
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.rename)) },
                             onClick = { menu = false; rename = true },
@@ -305,6 +310,30 @@ fun DetailsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { rename = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    if (refreshLink) {
+        var url by remember(rec?.id) { mutableStateOf(rec?.url.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { refreshLink = false },
+            title = { Text(stringResource(R.string.refresh_link)) },
+            text = {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text(stringResource(R.string.url_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.refreshLink(url); refreshLink = false }) {
+                    Text(stringResource(R.string.save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { refreshLink = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

@@ -139,6 +139,9 @@
     <string name="pick_quality">Pick quality</string>
     <string name="audio_only">Audio</string>
     <string name="mbps">%1$.1f Mbps</string>
+    <string name="refresh_link">Refresh link…</string>
+    <string name="browser_section">Browser</string>
+    <string name="block_ads_desc">Block ads and trackers while browsing.</string>
     <string name="recheck">Recheck</string>
     <string name="move_storage">Move storage…</string>
     <string name="export_torrent">Export .torrent</string>
