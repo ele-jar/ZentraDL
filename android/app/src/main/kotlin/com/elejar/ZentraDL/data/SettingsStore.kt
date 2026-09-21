@@ -38,6 +38,11 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     private val seedGoalKey = intPreferencesKey("seed_goal_ratio")
     private val adblockKey = booleanPreferencesKey("adblock_enabled")
     private val smartMasterKey = booleanPreferencesKey("smart_master")
+    private val quietEnabledKey = booleanPreferencesKey("quiet_enabled")
+    private val quietStartKey = intPreferencesKey("quiet_start_min")
+    private val quietEndKey = intPreferencesKey("quiet_end_min")
+    private val failuresOnlyKey = booleanPreferencesKey("failures_only")
+    private val hideTinyKey = booleanPreferencesKey("hide_tiny")
 
     val connections: Flow<Int> = ctx.prefs.data.map { it[connectionsKey] ?: 8 }
     val maxRunning: Flow<Int> = ctx.prefs.data.map { it[maxRunningKey] ?: 3 }
@@ -60,6 +65,12 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     val seedGoal: Flow<Int> = ctx.prefs.data.map { it[seedGoalKey] ?: 0 }
     val adblock: Flow<Boolean> = ctx.prefs.data.map { it[adblockKey] ?: true }
     val smartMaster: Flow<Boolean> = ctx.prefs.data.map { it[smartMasterKey] ?: true }
+    val quietEnabled: Flow<Boolean> = ctx.prefs.data.map { it[quietEnabledKey] ?: false }
+    val quietStartMin: Flow<Int> = ctx.prefs.data.map { it[quietStartKey] ?: 1320 }
+    val quietEndMin: Flow<Int> = ctx.prefs.data.map { it[quietEndKey] ?: 420 }
+    val failuresOnly: Flow<Boolean> = ctx.prefs.data.map { it[failuresOnlyKey] ?: false }
+    /** Hide "completed" notifications for files under 1 MB. */
+    val hideTiny: Flow<Boolean> = ctx.prefs.data.map { it[hideTinyKey] ?: false }
 
     /** Combined queue-gate policy (P3d). */
     val gatePolicy: Flow<GatePolicy> = combine(
@@ -143,4 +154,25 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
     suspend fun setSmartMaster(v: Boolean) {
         ctx.prefs.edit { it[smartMasterKey] = v }
     }
+
+    suspend fun setQuietEnabled(v: Boolean) {
+        ctx.prefs.edit { it[quietEnabledKey] = v }
+    }
+
+    suspend fun setQuietStartMin(v: Int) {
+        ctx.prefs.edit { it[quietStartKey] = v.coerceIn(0, 1439) }
+    }
+
+    suspend fun setQuietEndMin(v: Int) {
+        ctx.prefs.edit { it[quietEndKey] = v.coerceIn(0, 1440) }
+    }
+
+    suspend fun setFailuresOnly(v: Boolean) {
+        ctx.prefs.edit { it[failuresOnlyKey] = v }
+    }
+
+    suspend fun setHideTiny(v: Boolean) {
+        ctx.prefs.edit { it[hideTinyKey] = v }
+    }
+}
 }

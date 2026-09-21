@@ -16,11 +16,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.rememberCoroutineScope
+import com.elejar.ZentraDL.domain.rules.RuleTemplates
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -32,7 +36,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.elejar.ZentraDL.BuildConfig
@@ -68,6 +74,11 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val seedGoal by vm.seedGoal.collectAsState()
     val adblock by vm.adblock.collectAsState()
     val smartMaster by vm.smartMaster.collectAsState()
+    val quietEnabled by vm.quietEnabled.collectAsState()
+    val quietStart by vm.quietStartMin.collectAsState()
+    val quietEnd by vm.quietEndMin.collectAsState()
+    val failuresOnly by vm.failuresOnly.collectAsState()
+    val hideTiny by vm.hideTiny.collectAsState()
     val themeTitle = stringResource(R.string.theme)
     val accentTitle = stringResource(R.string.accent)
 
@@ -310,6 +321,51 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
             }
+            if (matches("notif", "quiet", "sound", "failures", "tiny")) {
+                item { SectionHeader(stringResource(R.string.notif_section)) }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.quiet_hours),
+                        description = stringResource(R.string.quiet_hours_desc),
+                        checked = quietEnabled,
+                        onCheckedChange = { vm.setQuietEnabled(it) },
+                    )
+                }
+                if (quietEnabled) {
+                    item {
+                        ChoiceRow(
+                            title = stringResource(R.string.quiet_start),
+                            description = stringResource(R.string.quiet_start_desc),
+                            value = fmtMin(quietStart),
+                            onClick = { timePick = "quiet_start" },
+                        )
+                    }
+                    item {
+                        ChoiceRow(
+                            title = stringResource(R.string.quiet_end),
+                            description = stringResource(R.string.quiet_end_desc),
+                            value = fmtMin(quietEnd),
+                            onClick = { timePick = "quiet_end" },
+                        )
+                    }
+                }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.failures_only),
+                        description = stringResource(R.string.failures_only_desc),
+                        checked = failuresOnly,
+                        onCheckedChange = { vm.setFailuresOnly(it) },
+                    )
+                }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.hide_tiny),
+                        description = stringResource(R.string.hide_tiny_desc),
+                        checked = hideTiny,
+                        onCheckedChange = { vm.setHideTiny(it) },
+                    )
+                }
+            }
             if (matches("smart", "rules", "automation", "auto-sort", "rename")) {
                 item { SectionHeader(stringResource(R.string.smart_section)) }
                 item {
@@ -321,12 +377,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
                 item {
-                    Text(
-                        stringResource(R.string.smart_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
+                    RulesBlock(vm)
                 }
             }
             if (matches("about", "version", "license")) {
@@ -394,19 +445,38 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
         )
     }
     timePick?.let { which ->
-        val initial = if (which == "start") schedStart else schedEnd
+        val initial = when (which) {
+            "start" -> schedStart
+            "end" -> schedEnd
+            "quiet_start" -> quietStart
+            else -> quietEnd
+        }
         val picker = rememberTimePickerState(initialHour = initial / 60, initialMinute = initial % 60, is24Hour = true)
         AlertDialog(
             onDismissRequest = { timePick = null },
             title = {
-                Text(stringResource(if (which == "start") R.string.schedule_start else R.string.schedule_end))
+                Text(
+                    stringResource(
+                        when (which) {
+                            "start" -> R.string.schedule_start
+                            "end" -> R.string.schedule_end
+                            "quiet_start" -> R.string.quiet_start
+                            else -> R.string.quiet_end
+                        },
+                    ),
+                )
             },
             text = { TimePicker(picker) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         val m = picker.hour * 60 + picker.minute
-                        if (which == "start") vm.setSchedStartMin(m) else vm.setSchedEndMin(m)
+                        when (which) {
+                            "start" -> vm.setSchedStartMin(m)
+                            "end" -> vm.setSchedEndMin(m)
+                            "quiet_start" -> vm.setQuietStartMin(m)
+                            else -> vm.setQuietEndMin(m)
+                        }
                         timePick = null
                     },
                 ) { Text(stringResource(R.string.ok)) }
@@ -437,6 +507,159 @@ private fun SectionHeader(title: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
+}
+
+/** Rules manager (R2-lite): templates, toggles, dry-run preview, text export/import. */
+@Composable
+private fun RulesBlock(vm: SettingsViewModel) {
+    val rules by vm.ruleList.collectAsState()
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var showTemplates by remember { mutableStateOf(false) }
+    var preview by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
+    var showExport by remember { mutableStateOf(false) }
+    var showImport by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { vm.refreshRules() }
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text(
+            stringResource(R.string.smart_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        rules.forEach { r ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) {
+                    Text(r.name, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "${r.trigger.name} · ${r.actions.size} actions",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            preview = r.name to vm.previewRule(r.id)
+                        }
+                    },
+                ) { Text(stringResource(R.string.preview)) }
+                Switch(
+                    checked = r.enabled,
+                    onCheckedChange = { vm.toggleRule(r.id, it) },
+                )
+                IconButton(onClick = { vm.deleteRule(r.id) }) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete_rule, r.name))
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { showTemplates = true }) { Text(stringResource(R.string.add_rule)) }
+            TextButton(onClick = { showExport = true }) { Text(stringResource(R.string.export_rules)) }
+            TextButton(onClick = { showImport = true }) { Text(stringResource(R.string.import_rules)) }
+        }
+    }
+    if (showTemplates) {
+        var pick by remember { mutableStateOf(0) }
+        val templates = remember { RuleTemplates.all() }
+        AlertDialog(
+            onDismissRequest = { showTemplates = false },
+            title = { Text(stringResource(R.string.add_rule)) },
+            text = {
+                Column {
+                    templates.forEachIndexed { i, t ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { pick = i }
+                                .padding(vertical = 8.dp),
+                        ) {
+                            RadioButton(selected = pick == i, onClick = null)
+                            Text(t.name)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { vm.addTemplate(templates[pick]); showTemplates = false },
+                ) { Text(stringResource(R.string.add_rule)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTemplates = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    preview?.let { (name, lines) ->
+        AlertDialog(
+            onDismissRequest = { preview = null },
+            title = { Text(stringResource(R.string.preview_title, name)) },
+            text = {
+                Text(
+                    if (lines.isEmpty()) stringResource(R.string.preview_empty)
+                    else lines.take(20).joinToString("\n"),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                )
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { preview = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    if (showExport) {
+        AlertDialog(
+            onDismissRequest = { showExport = false },
+            title = { Text(stringResource(R.string.export_rules)) },
+            text = {
+                Text(
+                    vm.exportText().ifBlank { stringResource(R.string.no_rules) },
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { shareText(ctx, vm.exportText()); showExport = false },
+                ) { Text(stringResource(R.string.share)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExport = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    if (showImport) {
+        var text by remember { mutableStateOf("") }
+        var done by remember { mutableStateOf<Int?>(null) }
+        AlertDialog(
+            onDismissRequest = { showImport = false },
+            title = { Text(stringResource(R.string.import_rules)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it; done = null },
+                        label = { Text(stringResource(R.string.paste_rules)) },
+                        minLines = 4,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    done?.let { Text(stringResource(R.string.imported_n, it)) }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { scope.launch { done = vm.importText(text) } },
+                    enabled = text.isNotBlank(),
+                ) { Text(stringResource(R.string.import_rules)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImport = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 }
 
 @Composable

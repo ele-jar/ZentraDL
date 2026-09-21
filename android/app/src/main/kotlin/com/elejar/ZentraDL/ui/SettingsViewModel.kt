@@ -5,10 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.local.Category
+import com.elejar.ZentraDL.domain.rules.Rule
+import com.elejar.ZentraDL.domain.rules.RuleTemplates
+import com.elejar.ZentraDL.domain.rules.RuleText
+import com.elejar.ZentraDL.domain.rules.RuleEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -17,6 +23,7 @@ import kotlinx.coroutines.launch
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val repo: TaskRepository,
+    private val rules: RuleEngine,
 ) : ViewModel() {
     val themeMode: StateFlow<String> = settings.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "System")
@@ -73,11 +80,84 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setAdblock(v) }
     }
 
+    val quietEnabled: StateFlow<Boolean> = settings.quietEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val quietStartMin: StateFlow<Int> = settings.quietStartMin
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1320)
+    val quietEndMin: StateFlow<Int> = settings.quietEndMin
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 420)
+    val failuresOnly: StateFlow<Boolean> = settings.failuresOnly
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val hideTiny: StateFlow<Boolean> = settings.hideTiny
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setQuietEnabled(v: Boolean) {
+        viewModelScope.launch { settings.setQuietEnabled(v) }
+    }
+
+    fun setQuietStartMin(v: Int) {
+        viewModelScope.launch { settings.setQuietStartMin(v) }
+    }
+
+    fun setQuietEndMin(v: Int) {
+        viewModelScope.launch { settings.setQuietEndMin(v) }
+    }
+
+    fun setFailuresOnly(v: Boolean) {
+        viewModelScope.launch { settings.setFailuresOnly(v) }
+    }
+
+    fun setHideTiny(v: Boolean) {
+        viewModelScope.launch { settings.setHideTiny(v) }
+    }
+
     val smartMaster: StateFlow<Boolean> = settings.smartMaster
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     fun setSmartMaster(v: Boolean) {
         viewModelScope.launch { settings.setSmartMaster(v) }
+    }
+
+    private val _ruleList = MutableStateFlow(emptyList<Rule>())
+    val ruleList: StateFlow<List<Rule>> = _ruleList.asStateFlow()
+
+    fun refreshRules() {
+        viewModelScope.launch { _ruleList.value = rules.allRules() }
+    }
+
+    fun addTemplate(template: Rule) {
+        viewModelScope.launch {
+            rules.addRule(template.copy(id = rules.newId()))
+            refreshRules()
+        }
+    }
+
+    fun toggleRule(id: String, enabled: Boolean) {
+        viewModelScope.launch {
+            rules.setEnabled(id, enabled)
+            refreshRules()
+        }
+    }
+
+    fun deleteRule(id: String) {
+        viewModelScope.launch {
+            rules.deleteRule(id)
+            refreshRules()
+        }
+    }
+
+    suspend fun previewRule(id: String): List<String> {
+        val rule = _ruleList.value.firstOrNull { it.id == id } ?: return emptyList()
+        return rules.dryRun(rule)
+    }
+
+    fun exportText(): String = RuleText.export(_ruleList.value)
+
+    suspend fun importText(text: String): Int {
+        val parsed = RuleText.parse(text) { rules.newId() }
+        parsed.forEach { rules.addRule(it) }
+        _ruleList.value = rules.allRules()
+        return parsed.size
     }
 
     fun setWifiOnly(v: Boolean) {

@@ -13,6 +13,7 @@ import androidx.core.app.ServiceCompat
 import com.elejar.ZentraDL.DownloadChannels
 import com.elejar.ZentraDL.MainActivity
 import com.elejar.ZentraDL.R
+import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.TorrentRepository
 import com.elejar.ZentraDL.engine.model.DownloadProgress
@@ -25,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -40,6 +42,7 @@ class DownloadService : Service() {
 
     @Inject lateinit var repo: TaskRepository
     @Inject lateinit var trepo: TorrentRepository
+    @Inject lateinit var settings: SettingsStore
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val notifIds = mutableMapOf<String, Int>()
@@ -189,7 +192,11 @@ class DownloadService : Service() {
         return builder.build()
     }
 
-    private fun showCompleted(rec: com.elejar.ZentraDL.data.local.TaskRecord) {
+    private suspend fun showCompleted(rec: com.elejar.ZentraDL.data.local.TaskRecord) {
+        // S10-lite: failures-only skips these; hide-tiny skips <1 MB files.
+        if (settings.failuresOnly.first()) return
+        if (settings.hideTiny.first() && rec.totalBytes in 1..1_048_575) return
+        val quiet = quietNow()
         val file = File(rec.destPath, rec.fileName)
         val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", file)
         val mime = android.webkit.MimeTypeMap.getSingleton()
@@ -217,13 +224,14 @@ class DownloadService : Service() {
             .setContentIntent(open)
             .setAutoCancel(true)
             .setGroup(GROUP)
+            .setSilent(quiet)
             .addAction(android.R.drawable.ic_menu_view, getString(R.string.open_file), open)
             .addAction(android.R.drawable.ic_menu_share, getString(R.string.share), share)
             .build()
         notify(terminalId(), n)
     }
 
-    private fun showFailed(id: String, name: String, error: String?, retryAction: String) {
+    private suspend fun showFailed(id: String, name: String, error: String?, retryAction: String) {
         val retry = serviceIntent(retryAction, id, id.hashCode())
         val n = NotificationCompat.Builder(this, DownloadChannels.FAILED)
             .setContentTitle(name)
@@ -232,9 +240,20 @@ class DownloadService : Service() {
             .setContentIntent(contentIntent())
             .setAutoCancel(true)
             .setGroup(GROUP)
+            .setSilent(quietNow())
             .addAction(android.R.drawable.ic_menu_rotate, getString(R.string.retry), retry)
             .build()
         notify(terminalId(), n)
+    }
+
+    /** Quiet-hours check (same overnight-wrap window semantics as the scheduler). */
+    private suspend fun quietNow(): Boolean {
+        if (!settings.quietEnabled.first()) return false
+        val start = settings.quietStartMin.first()
+        val end = settings.quietEndMin.first()
+        if (start !in 0..<1440 || end !in 0..1440 || start == end) return false
+        val now = com.elejar.ZentraDL.data.nowMinuteOfDay()
+        return if (start < end) now !in start..<end else !(now >= start || now < end)
     }
 
     private suspend fun updateSummary() {

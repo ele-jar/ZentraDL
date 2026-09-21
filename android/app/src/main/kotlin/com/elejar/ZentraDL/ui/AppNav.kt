@@ -2,6 +2,7 @@ package com.elejar.ZentraDL.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
@@ -34,9 +35,12 @@ data class TorrentDetails(val id: String)
 object Browser
 
 @Serializable
+object Activity
+
+@Serializable
 object Settings
 
-/** App navigation (P5a: + Browser; Activity lands in P6). */
+/** App navigation (P6b: + Activity; full nav per U2). */
 @Composable
 fun AppNav(pendingUrl: String? = null) {
     val nav = rememberNavController()
@@ -44,7 +48,7 @@ fun AppNav(pendingUrl: String? = null) {
     // Bottom bar on top-level destinations only.
     val topRoute = entry?.destination?.route
     val showBar = topRoute == Downloads::class.qualifiedName || topRoute == Settings::class.qualifiedName ||
-        topRoute == Browser::class.qualifiedName
+        topRoute == Browser::class.qualifiedName || topRoute == Activity::class.qualifiedName
     Scaffold(
         bottomBar = {
             if (showBar) {
@@ -60,6 +64,12 @@ fun AppNav(pendingUrl: String? = null) {
                         onClick = { nav.navigate(Browser) { launchSingleTop = true } },
                         icon = { Icon(Icons.Filled.Language, contentDescription = null) },
                         label = { Text(stringResource(R.string.browser_tab)) },
+                    )
+                    NavigationBarItem(
+                        selected = topRoute == Activity::class.qualifiedName,
+                        onClick = { nav.navigate(Activity) { launchSingleTop = true } },
+                        icon = { Icon(Icons.Filled.BarChart, contentDescription = null) },
+                        label = { Text(stringResource(R.string.activity_tab)) },
                     )
                     NavigationBarItem(
                         selected = topRoute == Settings::class.qualifiedName,
@@ -86,6 +96,9 @@ fun AppNav(pendingUrl: String? = null) {
                     pendingUrl?.substringBefore('?')
                         ?.endsWith(".mpd", ignoreCase = true) == true
                 BrowserScreen(initialUrl = if (isPlaylist) pendingUrl ?: "" else "")
+            }
+            composable<Activity> {
+                ActivityScreen()
             }
             composable<Details> {
                 DetailsScreen(onBack = { nav.popBackStack() }, onDeleted = { nav.popBackStack() })
