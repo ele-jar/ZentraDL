@@ -175,4 +175,3 @@ class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Con
         ctx.prefs.edit { it[hideTinyKey] = v }
     }
 }
-}
