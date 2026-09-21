@@ -103,11 +103,14 @@ class RulesTest {
         val conds = listOf(
             RuleCondition.Ext(setOf("mp4", "mkv")),
             RuleCondition.MinSize(100),
-            RuleCondition.Host("Example.COM"),
+            RuleCondition.Host("example.com"),
             RuleCondition.NameRe(".*1080p.*"),
         )
         val decoded = conds.map { RuleCodec.decodeCondition(RuleCodec.encodeCondition(it)) }
         assertThat(decoded).containsExactlyElementsIn(conds).inOrder()
+        // Host normalizes case on encode.
+        assertThat(RuleCodec.decodeCondition(RuleCodec.encodeCondition(RuleCondition.Host("Example.COM"))))
+            .isEqualTo(RuleCondition.Host("example.com"))
         assertThat(RuleCodec.decodeCondition("ext:")).isNull()
         assertThat(RuleCodec.decodeCondition("minSize:abc")).isNull()
         assertThat(RuleCodec.decodeCondition("nope:x")).isNull()

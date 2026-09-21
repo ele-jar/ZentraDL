@@ -12,7 +12,6 @@ import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import org.json.JSONObject
 
 /**
  * Automation engine (R1): evaluates [Rule]s on triggers, applies actions,
@@ -135,18 +134,15 @@ class RuleEngine(
     /** Undo a logged move/rename. False = files changed since. */
     suspend fun undo(logId: Long): Boolean {
         val entry = log.get(logId) ?: return false
-        val undo = entry.undoJson?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return false
-        val taskId = undo.optString("taskId")
-        val fromDir = undo.optString("fromDir")
-        val fromName = undo.optString("fromName")
-        val rec = tasks.get(taskId) ?: return false
+        val undo = entry.undoJson?.let { UndoPayload.decode(it) } ?: return false
+        val rec = tasks.get(undo.taskId) ?: return false
         val src = File(rec.destPath, rec.fileName)
-        val destDir = File(fromDir).apply { if (!exists()) return false }
-        val dest = File(destDir, fromName)
+        val destDir = File(undo.fromDir).apply { if (!exists()) return false }
+        val dest = File(destDir, undo.fromName)
         if (src.exists()) {
             if (dest.exists() || !src.renameTo(dest)) return false
         }
-        tasks.updateMeta(taskId, fromName, rec.totalBytes, destDir.absolutePath)
+        tasks.updateMeta(undo.taskId, undo.fromName, rec.totalBytes, destDir.absolutePath)
         log.delete(logId)
         return true
     }
@@ -160,7 +156,7 @@ class RuleEngine(
     }
 
     private fun undo(taskId: String, fromDir: String, fromName: String): String =
-        JSONObject().put("taskId", taskId).put("fromDir", fromDir).put("fromName", fromName).toString()
+        UndoPayload.encode(UndoPayload(taskId, fromDir, fromName))
 
     private fun RuleEntity.toRule(): Rule? {
         val trigger = runCatching { Trigger.valueOf(trigger) }.getOrNull() ?: return null

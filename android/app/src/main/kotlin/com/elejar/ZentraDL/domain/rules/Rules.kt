@@ -1,6 +1,8 @@
 package com.elejar.ZentraDL.domain.rules
 
 import com.elejar.ZentraDL.data.local.TaskRecord
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 /**
  * Automation rules (P6a, S1–S3 on this engine; R1).
@@ -90,4 +92,14 @@ object RuleMatch {
     }
 
     fun matchesAll(rec: TaskRecord, conds: List<RuleCondition>): Boolean = conds.all { matches(rec, it) }
+}
+
+/** Undo payload for a logged move/rename (kotlinx.serialization — no Android stubs). */
+@Serializable
+data class UndoPayload(val taskId: String, val fromDir: String, val fromName: String) {
+    companion object {
+        private val json = Json { ignoreUnknownKeys = true }
+        fun encode(p: UndoPayload): String = json.encodeToString(serializer(), p)
+        fun decode(s: String): UndoPayload? = runCatching { json.decodeFromString(serializer(), s) }.getOrNull()
+    }
 }
