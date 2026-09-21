@@ -11,12 +11,16 @@ import com.elejar.ZentraDL.domain.rules.RuleText
 import com.elejar.ZentraDL.domain.rules.RuleEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withContext
 
 /** Settings state (P2c; the screen UI lands with notification/settings commit). */
 @HiltViewModel
@@ -158,6 +162,46 @@ class SettingsViewModel @Inject constructor(
         parsed.forEach { rules.addRule(it) }
         _ruleList.value = rules.allRules()
         return parsed.size
+    }
+
+    data class StorageInfo(val freeBytes: Long, val usedBytes: Long)
+
+    private val _storage = MutableStateFlow<StorageInfo?>(null)
+    val storageInfo: StateFlow<StorageInfo?> = _storage.asStateFlow()
+
+    private val _cleanupMsg = MutableStateFlow<String?>(null)
+    val cleanupMsg: StateFlow<String?> = _cleanupMsg.asStateFlow()
+
+    fun refreshStorage() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val dir = repo.defaultDir
+            var used = 0L
+            dir.walkTopDown().forEach { if (it.isFile) used += it.length() }
+            _storage.value = StorageInfo(dir.usableSpace, used)
+        }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch {
+            _cleanupMsg.value = null
+            val n = withContext(Dispatchers.IO) { repo.clearCompletedHistory() }
+            _cleanupMsg.value = "Cleared $n completed records"
+        }
+    }
+
+    fun deleteFailedFiles() {
+        viewModelScope.launch {
+            _cleanupMsg.value = null
+            val n = withContext(Dispatchers.IO) { repo.deleteFailedFiles() }
+            _cleanupMsg.value = "Deleted $n leftover files"
+            refreshStorage()
+        }
+    }
+
+    fun consumeCleanupMsg(): String? {
+        val m = _cleanupMsg.value
+        _cleanupMsg.value = null
+        return m
     }
 
     fun setWifiOnly(v: Boolean) {

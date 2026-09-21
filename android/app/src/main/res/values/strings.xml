@@ -172,6 +172,12 @@
     <string name="paste_rules">Paste rule text</string>
     <string name="imported_n">Imported %1$d rules.</string>
     <string name="no_rules">No rules yet.</string>
+    <string name="storage_overview">%1$s free · %2$s in downloads</string>
+    <string name="clear_history_btn">Clear history</string>
+    <string name="delete_failed_btn">Delete failed files</string>
+    <string name="confirm_cleanup">Are you sure?</string>
+    <string name="clear_history_text">Completed entries will be removed from the list. Downloaded files stay.</string>
+    <string name="delete_failed_text">Leftover files of failed downloads will be deleted. Entries stay for retry.</string>
     <string name="smart_section">Smart features</string>
     <string name="smart_master">Smart automation</string>
     <string name="smart_master_desc">Let rules sort and rename finished downloads.</string>

@@ -24,6 +24,12 @@
 | `max_peers` | Torrents | 50 | Peers per torrent 5–200 (new sessions) |
 | `seed_goal` | Torrents | 0 (forever) | Stop seeding at ratio ×100 |
 | `adblock_enabled` | Browser | on | Host-list ad/tracker blocking |
+| `smart_master` | Smart features | on | Master switch for automation rules |
+| `quiet_enabled` | Notifications | off | Silent notifications in window |
+| `quiet_start_min` | Notifications | 1320 (22:00) | Quiet window start |
+| `quiet_end_min` | Notifications | 420 (07:00) | Quiet window end |
+| `failures_only` | Notifications | off | Skip completed notifications |
+| `hide_tiny` | Notifications | off | Skip <1 MB completed notifications |
 | (categories) | Storage & organization | 7 built-ins | Room table; per-category folders; add/delete in Settings |
 
 > Reset-per-section, Torrent/Browser/Notifications/Smart groups, backup/restore: later phases.

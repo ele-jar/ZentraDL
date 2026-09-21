@@ -203,6 +203,9 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                         Text(stringResource(R.string.add_category))
                     }
                 }
+                item {
+                    StorageBlock(vm)
+                }
             }
             if (matches("network", "wifi", "charging", "schedule", "speed", "limit")) {
                 item { SectionHeader(stringResource(R.string.network_section)) }
@@ -508,6 +511,60 @@ private fun SectionHeader(title: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
+}
+
+/** Storage overview + approved cleanups (S9-lite). */
+@Composable
+private fun StorageBlock(vm: SettingsViewModel) {
+    val info by vm.storageInfo.collectAsState()
+    val msg by vm.cleanupMsg.collectAsState()
+    var confirm by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) { vm.refreshStorage() }
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text(
+            info?.let { stringResource(R.string.storage_overview, Format.bytes(it.freeBytes), Format.bytes(it.usedBytes)) }
+                ?: stringResource(R.string.loading),
+            style = MaterialTheme.typography.bodyMedium,
+            fontFamily = FontFamily.Monospace,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { confirm = "history" }) { Text(stringResource(R.string.clear_history_btn)) }
+            TextButton(onClick = { confirm = "failed" }) { Text(stringResource(R.string.delete_failed_btn)) }
+        }
+        msg?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+    confirm?.let { which ->
+        AlertDialog(
+            onDismissRequest = { confirm = null },
+            title = { Text(stringResource(R.string.confirm_cleanup)) },
+            text = {
+                Text(
+                    stringResource(
+                        if (which == "history") R.string.clear_history_text else R.string.delete_failed_text,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirm = null
+                        if (which == "history") vm.clearHistory() else vm.deleteFailedFiles()
+                    },
+                ) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirm = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 }
 
 /** Rules manager (R2-lite): templates, toggles, dry-run preview, text export/import. */

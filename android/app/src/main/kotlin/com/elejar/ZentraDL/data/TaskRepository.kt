@@ -197,6 +197,31 @@ class TaskRepository @Inject constructor(
         }
     }
 
+    /** Delete completed task records (files stay). Returns the count. */
+    suspend fun clearCompletedHistory(): Int {
+        val ids = dao.allOnce().filter { it.status == "completed" }.map { it.id }
+        ids.forEach { dao.delete(it) }
+        return ids.size
+    }
+
+    /** Delete leftover files of failed tasks (records stay for retry). Returns the count. */
+    suspend fun deleteFailedFiles(): Int {
+        val recs = dao.allOnce().filter { it.status == "failed" }
+        var n = 0
+        recs.forEach { rec ->
+            if (File(rec.destPath, rec.fileName).takeIf { it.exists() }?.deleteRecursively() == true) n++
+        }
+        return n
+    }
+
+    /** Free-space preflight (H11-lite): fail fast instead of dying mid-write. */
+    private fun checkSpace(destDir: File, totalBytes: Long) {
+        if (totalBytes > 0 && destDir.usableSpace in 1..<totalBytes) {
+            throw java.io.IOException(
+                "No space left on device — need ${totalBytes / 1_048_576} MB",
+            )
+        }
+    }
     /** Refresh an expired link in place (H5): new URL, re-queued, partial kept for resume. */
     suspend fun refreshUrl(id: String, url: String): Boolean {
         val clean = url.trim()
@@ -378,6 +403,7 @@ class TaskRepository @Inject constructor(
             // Probe for accurate name/size (download() probes again internally; P2 dedups).
             val info = downloader.probe(rec.url, emptyMap())
             val destDir = File(rec.destPath).apply { mkdirs() }
+            checkSpace(destDir, info.totalBytes)
             dao.updateMeta(id, info.fileName, info.totalBytes, destDir.absolutePath)
             val spec = DownloadSpec(rec.url, File(destDir, info.fileName), connections = conns)
             downloader.download(spec).collect { p ->
