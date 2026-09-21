@@ -172,6 +172,13 @@
     <string name="paste_rules">Paste rule text</string>
     <string name="imported_n">Imported %1$d rules.</string>
     <string name="no_rules">No rules yet.</string>
+    <string name="backup_section">Backup &amp; restore</string>
+    <string name="backup_desc">Plaintext JSON: settings, categories, bookmarks, rules, task list. No passwords stored — none needed.</string>
+    <string name="backup_export">Export</string>
+    <string name="backup_import">Import</string>
+    <string name="backup_saved">Backup saved.</string>
+    <string name="backup_failed">Backup failed</string>
+    <string name="widget_desc">Active downloads with pause-all.</string>
     <string name="skip">Skip</string>
     <string name="next">Next</string>
     <string name="done">Done</string>

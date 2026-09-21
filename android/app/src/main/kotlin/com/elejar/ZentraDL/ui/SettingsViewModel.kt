@@ -2,6 +2,7 @@ package com.elejar.ZentraDL.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elejar.ZentraDL.data.BackupManager
 import com.elejar.ZentraDL.data.SettingsStore
 import com.elejar.ZentraDL.data.TaskRepository
 import com.elejar.ZentraDL.data.local.Category
@@ -26,6 +27,7 @@ class SettingsViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val repo: TaskRepository,
     private val rules: RuleEngine,
+    private val backup: BackupManager,
 ) : ViewModel() {
     val themeMode: StateFlow<String> = settings.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "System")
@@ -234,6 +236,25 @@ class SettingsViewModel @Inject constructor(
     fun consumeCleanupMsg(): String? {
         val m = _cleanupMsg.value
         _cleanupMsg.value = null
+        return m
+    }
+
+    private val _backupMsg = MutableStateFlow<String?>(null)
+    val backupMsg: StateFlow<String?> = _backupMsg.asStateFlow()
+
+    suspend fun exportBackup(): ByteArray = backup.export()
+
+    fun importBackup(bytes: ByteArray) {
+        viewModelScope.launch {
+            _backupMsg.value = backup.import(bytes)
+            refreshRules()
+            refreshStorage()
+        }
+    }
+
+    fun consumeBackupMsg(): String? {
+        val m = _backupMsg.value
+        _backupMsg.value = null
         return m
     }
 

@@ -1,6 +1,7 @@
 package com.elejar.ZentraDL.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -19,6 +20,12 @@ private val Context.prefs by preferencesDataStore("settings")
 /** App settings (documented in docs/SETTINGS.md as they land). */
 @Singleton
 class SettingsStore @Inject constructor(@ApplicationContext private val ctx: Context) {
+    /** Raw prefs access for backup/restore. */
+    val data: Flow<androidx.datastore.preferences.core.Preferences> = ctx.prefs.data
+
+    suspend fun <T> editRaw(key: Preferences.Key<T>, value: T) {
+        ctx.prefs.edit { it[key] = value }
+    }
     private val connectionsKey = intPreferencesKey("connections")
     private val maxRunningKey = intPreferencesKey("max_running")
     private val densityKey = stringPreferencesKey("density")

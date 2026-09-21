@@ -1,5 +1,6 @@
 package com.elejar.ZentraDL.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.elejar.ZentraDL.domain.rules.RuleTemplates
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -314,8 +316,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     )
                 }
             }
-            if (matches("browser", "ads", "block")) {
-                item { SectionHeader(stringResource(R.string.browser_section)) }
+            if (matches("browser", "ads", "block")) {                item { SectionHeader(stringResource(R.string.browser_section)) }
                 item {
                     SwitchRow(
                         title = stringResource(R.string.block_ads),
@@ -382,6 +383,12 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                 }
                 item {
                     RulesBlock(vm)
+                }
+            }
+            if (matches("backup", "restore", "export", "import")) {
+                item { SectionHeader(stringResource(R.string.backup_section)) }
+                item {
+                    BackupBlock(vm)
                 }
             }
             if (matches("about", "version", "license")) {
@@ -763,5 +770,69 @@ private fun ChoiceRow(
             style = MaterialTheme.typography.bodyMedium,
             color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/** Backup & restore (X2): plaintext JSON via Storage Access, no secrets stored. */
+@Composable
+private fun BackupBlock(vm: SettingsViewModel) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val savedText = stringResource(R.string.backup_saved)
+    val failedText = stringResource(R.string.backup_failed)
+    var msg by remember { mutableStateOf<String?>(null) }
+    val backupMsg by vm.backupMsg.collectAsState()
+    LaunchedEffect(backupMsg) {
+        backupMsg?.let {
+            msg = it
+            vm.consumeBackupMsg()
+        }
+    }
+    val exporter = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                runCatching {
+                    ctx.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(vm.exportBackup())
+                    } ?: throw IllegalStateException("no stream")
+                    msg = savedText
+                }.onFailure {
+                    msg = "$failedText: ${it.message.orEmpty()}"
+                }
+            }
+        }
+    }
+    val importer = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                val bytes = runCatching {
+                    ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                }.getOrNull()
+                if (bytes != null) vm.importBackup(bytes) else msg = failedText
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text(
+            stringResource(R.string.backup_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { exporter.launch("zentradl-backup.json") }) {
+                Text(stringResource(R.string.backup_export))
+            }
+            TextButton(onClick = { importer.launch(arrayOf("application/json")) }) {
+                Text(stringResource(R.string.backup_import))
+            }
+        }
+        msg?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        }
     }
 }

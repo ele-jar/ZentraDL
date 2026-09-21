@@ -70,6 +70,7 @@ private class FakeTaskDao : TaskDao {
 private class FakeTorrentDao : TorrentTaskDao {
     val rows = mutableMapOf<String, TorrentTask>()
     override suspend fun get(id: String): TorrentTask? = rows[id]
+    override suspend fun allOnce(): List<TorrentTask> = rows.values.toList()
     override fun observe(id: String): Flow<TorrentTask?> = flowOf(rows[id])
     override suspend fun insert(task: TorrentTask) {
         rows[task.id] = task

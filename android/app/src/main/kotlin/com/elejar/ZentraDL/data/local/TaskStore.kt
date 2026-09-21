@@ -95,6 +95,9 @@ interface BookmarkDao {
     @Query("SELECT * FROM bookmarks ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<Bookmark>>
 
+    @Query("SELECT * FROM bookmarks ORDER BY createdAt DESC")
+    suspend fun allOnce(): List<Bookmark>
+
     @Query("SELECT * FROM bookmarks WHERE url = :url LIMIT 1")
     suspend fun findByUrl(url: String): Bookmark?
 
@@ -210,6 +213,9 @@ data class TorrentTask(
 interface TorrentTaskDao {
     @Query("SELECT * FROM torrent_tasks WHERE id = :id")
     suspend fun get(id: String): TorrentTask?
+
+    @Query("SELECT * FROM torrent_tasks")
+    suspend fun allOnce(): List<TorrentTask>
 
     @Query("SELECT * FROM torrent_tasks WHERE id = :id")
     fun observe(id: String): Flow<TorrentTask?>
