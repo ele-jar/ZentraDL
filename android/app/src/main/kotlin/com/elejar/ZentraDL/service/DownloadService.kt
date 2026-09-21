@@ -49,7 +49,6 @@ class DownloadService : Service() {
     private var nextId = 10
     private var fgStarted = false
     private var lastSummary = ""
-    private var lastWidgetAt = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -113,12 +112,7 @@ class DownloadService : Service() {
             else -> Unit // paused/cancelled: stay quiet
         }
         updateSummary()
-        if (!repo.hasRunning() && !trepo.hasActive()) {
-            scope.launch {
-                runCatching { com.elejar.ZentraDL.ui.widget.DownloadsWidget.push(this@DownloadService, 0, 0) }
-            }
-            stopSelf()
-        }
+        if (!repo.hasRunning() && !trepo.hasActive()) stopSelf()
     }
 
     /** Torrent runs park while seeding (ongoing notification kept); pause/failed end it. */
@@ -133,12 +127,7 @@ class DownloadService : Service() {
             else -> cancelNotification(id) // paused/cancelled: stay quiet
         }
         updateSummary()
-        if (!repo.hasRunning() && !trepo.hasActive()) {
-            scope.launch {
-                runCatching { com.elejar.ZentraDL.ui.widget.DownloadsWidget.push(this@DownloadService, 0, 0) }
-            }
-            stopSelf()
-        }
+        if (!repo.hasRunning() && !trepo.hasActive()) stopSelf()
     }
 
     private suspend fun watchProgress(id: String, title: String) {
@@ -274,16 +263,7 @@ class DownloadService : Service() {
         val text = if (count == 0) "" else "$count downloading · ${Format.speed(total, total > 0)}"
         if (text == lastSummary) return
         lastSummary = text
-        // Widget push, throttled to 30s (X1).
-        val now = System.currentTimeMillis()
-        if (now - lastWidgetAt > 30_000) {
-            lastWidgetAt = now
-            scope.launch {
-                runCatching {
-                    com.elejar.ZentraDL.ui.widget.DownloadsWidget.push(this@DownloadService, count, total)
-                }
-            }
-        }        val nm = NotificationManagerCompat.from(this)
+        val nm = NotificationManagerCompat.from(this)
         if (text.isEmpty()) {
             try {
                 nm.cancel(SUMMARY_ID)

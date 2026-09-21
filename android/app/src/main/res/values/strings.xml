@@ -178,7 +178,6 @@
     <string name="backup_import">Import</string>
     <string name="backup_saved">Backup saved.</string>
     <string name="backup_failed">Backup failed</string>
-    <string name="widget_desc">Active downloads with pause-all.</string>
     <string name="skip">Skip</string>
     <string name="next">Next</string>
     <string name="done">Done</string>
