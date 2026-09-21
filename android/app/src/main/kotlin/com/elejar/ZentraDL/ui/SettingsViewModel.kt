@@ -141,7 +141,7 @@ class SettingsViewModel @Inject constructor(
                         .build()
                     com.elejar.ZentraDL.engine.http.defaultHttpClient().newCall(req).execute().use { resp ->
                         if (!resp.isSuccessful) return@use "Check failed (HTTP ${resp.code})"
-                        val body = resp.body.string()
+                        val body = resp.body?.string().orEmpty()
                         val tag = Regex(""""tag_name"\s*:\s*"([^"]+)"""").find(body)?.groupValues?.get(1)
                             ?: return@use "No releases yet"
                         val current = com.elejar.ZentraDL.BuildConfig.VERSION_NAME
