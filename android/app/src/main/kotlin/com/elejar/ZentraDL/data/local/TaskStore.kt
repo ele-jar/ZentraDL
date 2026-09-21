@@ -129,6 +129,66 @@ interface HistoryDao {
     suspend fun clear()
 }
 
+/** Automation rule (P6a; conditions/actions are `type:payload` lines). */
+@Entity(tableName = "rules")
+data class RuleEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val enabled: Boolean = true,
+    val trigger: String = "ON_COMPLETE",
+    val conditionsJson: String = "",
+    val actionsJson: String = "",
+    val createdAt: Long = 0,
+)
+
+@Dao
+interface RuleDao {
+    @Query("SELECT * FROM rules ORDER BY createdAt ASC")
+    fun observeAll(): Flow<List<RuleEntity>>
+
+    @Query("SELECT * FROM rules ORDER BY createdAt ASC")
+    suspend fun allOnce(): List<RuleEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(rule: RuleEntity)
+
+    @Query("UPDATE rules SET enabled = :enabled WHERE id = :id")
+    suspend fun updateEnabled(id: String, enabled: Boolean)
+
+    @Query("DELETE FROM rules WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+/** Undoable auto-action log (P6a; surfaced in Activity in P6b). */
+@Entity(tableName = "rule_log")
+data class RuleLogEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val timeMs: Long,
+    val text: String,
+    val undoJson: String? = null,
+)
+
+@Dao
+interface RuleLogDao {
+    @Query("SELECT * FROM rule_log ORDER BY timeMs DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<RuleLogEntry>
+
+    @Insert
+    suspend fun insert(entry: RuleLogEntry)
+
+    @Query("SELECT * FROM rule_log WHERE id = :id")
+    suspend fun get(id: Long): RuleLogEntry?
+
+    @Query("DELETE FROM rule_log WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM rule_log WHERE id NOT IN (SELECT id FROM rule_log ORDER BY timeMs DESC LIMIT :keep)")
+    suspend fun trim(keep: Int)
+
+    @Query("DELETE FROM rule_log")
+    suspend fun clear()
+}
+
 /**
  * Torrent extras keyed by info-hash (== [TaskRecord.id]). Transfer state
  * lives in [BtSession][com.elejar.ZentraDL.engine.torrent.BtSession].

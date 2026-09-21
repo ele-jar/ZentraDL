@@ -10,9 +10,13 @@ import com.elejar.ZentraDL.data.local.AppDatabase
 import com.elejar.ZentraDL.data.local.BookmarkDao
 import com.elejar.ZentraDL.data.local.CategoryDao
 import com.elejar.ZentraDL.data.local.HistoryDao
+import com.elejar.ZentraDL.data.local.RuleDao
+import com.elejar.ZentraDL.data.local.RuleLogDao
 import com.elejar.ZentraDL.data.local.TaskDao
 import com.elejar.ZentraDL.data.local.TorrentTaskDao
+import com.elejar.ZentraDL.domain.rules.RuleEngine
 import com.elejar.ZentraDL.engine.http.HttpDownloader
+import com.elejar.ZentraDL.engine.http.HlsDownloader
 import com.elejar.ZentraDL.engine.http.SpeedLimiter
 import com.elejar.ZentraDL.engine.model.Downloader
 import com.elejar.ZentraDL.engine.torrent.BtEngine
@@ -41,11 +45,29 @@ object AppModule {
             .addMigrations(
                 AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6,
             )
             .build()
 
     @Provides
     fun provideTaskDao(db: AppDatabase): TaskDao = db.taskDao()
+
+    @Provides
+    fun provideRuleDao(db: AppDatabase): RuleDao = db.ruleDao()
+
+    @Provides
+    fun provideRuleLogDao(db: AppDatabase): RuleLogDao = db.ruleLogDao()
+
+    @Provides
+    @Singleton
+    fun provideRuleEngine(
+        tasks: TaskDao,
+        rules: RuleDao,
+        log: RuleLogDao,
+        categories: CategoryDao,
+        settings: SettingsStore,
+        @ApplicationContext ctx: Context,
+    ): RuleEngine = RuleEngine(tasks, rules, log, categories, settings.smartMaster, ctx.filesDir)
 
     @Provides
     fun provideBookmarkDao(db: AppDatabase): BookmarkDao = db.bookmarkDao()
@@ -113,8 +135,10 @@ object AppModule {
         @ApplicationContext ctx: Context,
         categoryDao: CategoryDao,
         monitor: GateMonitor,
+        rules: RuleEngine,
     ): TaskRepository = TaskRepository(
         dao, downloader, settings.connections, settings.maxRunning, appScope,
         ctx.filesDir.resolve("downloads"), categoryDao, settings.gatePolicy, monitor.state,
+        hls = HlsDownloader(), rules = rules,
     )
 }

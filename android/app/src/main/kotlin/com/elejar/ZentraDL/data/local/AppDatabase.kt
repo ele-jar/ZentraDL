@@ -6,8 +6,11 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [TaskRecord::class, Category::class, TorrentTask::class, Bookmark::class, HistoryEntry::class],
-    version = 5,
+    entities = [
+        TaskRecord::class, Category::class, TorrentTask::class,
+        Bookmark::class, HistoryEntry::class, RuleEntity::class, RuleLogEntry::class,
+    ],
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -16,6 +19,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun torrentTaskDao(): TorrentTaskDao
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun historyDao(): HistoryDao
+    abstract fun ruleDao(): RuleDao
+    abstract fun ruleLogDao(): RuleLogDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -65,6 +70,24 @@ abstract class AppDatabase : RoomDatabase() {
                         "url TEXT NOT NULL, visitedAt INTEGER NOT NULL)",
                 )
                 db.execSQL("ALTER TABLE tasks ADD COLUMN extra TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        /** P6 schema: automation rules + undoable action log. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS rules (" +
+                        "id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, " +
+                        "enabled INTEGER NOT NULL DEFAULT 1, trigger TEXT NOT NULL DEFAULT 'ON_COMPLETE', " +
+                        "conditionsJson TEXT NOT NULL DEFAULT '', actionsJson TEXT NOT NULL DEFAULT '', " +
+                        "createdAt INTEGER NOT NULL DEFAULT 0)",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS rule_log (" +
+                        "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, timeMs INTEGER NOT NULL, " +
+                        "text TEXT NOT NULL, undoJson TEXT)",
+                )
             }
         }
     }

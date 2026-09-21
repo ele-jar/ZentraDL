@@ -9,6 +9,7 @@ import com.elejar.ZentraDL.domain.GateBlock
 import com.elejar.ZentraDL.domain.GatePolicy
 import com.elejar.ZentraDL.domain.GatePolicyCheck
 import com.elejar.ZentraDL.domain.NetState
+import com.elejar.ZentraDL.domain.rules.RuleEngine
 import com.elejar.ZentraDL.engine.http.HlsDownloader
 import com.elejar.ZentraDL.engine.http.HlsSpec
 import com.elejar.ZentraDL.engine.model.DownloadProgress
@@ -56,6 +57,7 @@ class TaskRepository @Inject constructor(
     policy: Flow<GatePolicy> = flowOf(GatePolicy()),
     netStates: Flow<NetState> = flowOf(NetState(connected = true, unmetered = true, charging = false)),
     private val hls: HlsDownloader = HlsDownloader(),
+    private val rules: RuleEngine? = null,
 ) {
     val records: Flow<List<TaskRecord>> = dao.observeAll()
     val categories: Flow<List<Category>> = categoryDao?.observeAll() ?: flowOf(emptyList())
@@ -130,6 +132,7 @@ class TaskRepository @Inject constructor(
                 categoryId = cat, kind = kind, extra = extra,
             ),
         )
+        dao.get(id)?.let { rules?.onAdd(it) }
         return id
     }
 
@@ -187,6 +190,10 @@ class TaskRepository @Inject constructor(
             jobs.remove(id)
             _progress.update { it - id }
             pump()
+        }
+        // Automation hook (P6a; torrents keep seeding, so only HTTP completes here).
+        if (dao.get(id)?.status == "completed") {
+            dao.get(id)?.let { rules?.onComplete(it) }
         }
     }
 
@@ -387,6 +394,9 @@ class TaskRepository @Inject constructor(
             jobs.remove(id)
             _progress.update { it - id }
             pump()
+        }
+        if (dao.get(id)?.status == "completed") {
+            dao.get(id)?.let { rules?.onComplete(it) }
         }
     }
 }

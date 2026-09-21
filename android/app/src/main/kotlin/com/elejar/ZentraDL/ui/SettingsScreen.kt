@@ -67,6 +67,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val maxPeers by vm.maxPeers.collectAsState()
     val seedGoal by vm.seedGoal.collectAsState()
     val adblock by vm.adblock.collectAsState()
+    val smartMaster by vm.smartMaster.collectAsState()
     val themeTitle = stringResource(R.string.theme)
     val accentTitle = stringResource(R.string.accent)
 
@@ -306,6 +307,25 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                         description = stringResource(R.string.block_ads_desc),
                         checked = adblock,
                         onCheckedChange = { vm.setAdblock(it) },
+                    )
+                }
+            }
+            if (matches("smart", "rules", "automation", "auto-sort", "rename")) {
+                item { SectionHeader(stringResource(R.string.smart_section)) }
+                item {
+                    SwitchRow(
+                        title = stringResource(R.string.smart_master),
+                        description = stringResource(R.string.smart_master_desc),
+                        checked = smartMaster,
+                        onCheckedChange = { vm.setSmartMaster(it) },
+                    )
+                }
+                item {
+                    Text(
+                        stringResource(R.string.smart_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }
             }

@@ -73,6 +73,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setAdblock(v) }
     }
 
+    val smartMaster: StateFlow<Boolean> = settings.smartMaster
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun setSmartMaster(v: Boolean) {
+        viewModelScope.launch { settings.setSmartMaster(v) }
+    }
+
     fun setWifiOnly(v: Boolean) {
         viewModelScope.launch { settings.setWifiOnly(v) }
     }
